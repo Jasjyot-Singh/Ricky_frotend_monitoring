@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Styles ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-surface-950 text-surface-100;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-500;
+  }
+}
+
+/* ─── Component Classes ────────────────────────────────────────────────────── */
+@layer components {
+  /* Glass card used throughout the dashboard */
+  .glass-card {
+    @apply bg-surface-900/60 backdrop-blur-md border border-surface-700/50 rounded-2xl;
+  }
+
+  /* Elevated glass card for important sections */
+  .glass-card-elevated {
+    @apply bg-surface-800/70 backdrop-blur-lg border border-surface-600/40 rounded-2xl shadow-xl shadow-black/20;
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full inline-block;
+  }
+
+  .status-dot--online {
+    @apply bg-fleet-400 shadow-lg shadow-fleet-400/50;
+  }
+
+  .status-dot--warning {
+    @apply bg-warning-400 shadow-lg shadow-warning-400/50;
+  }
+
+  .status-dot--danger {
+    @apply bg-danger-400 shadow-lg shadow-danger-400/50 animate-pulse;
+  }
+
+  .status-dot--offline {
+    @apply bg-surface-500;
+  }
+
+  /* Badge components */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge--success {
+    @apply bg-fleet-500/20 text-fleet-400 border border-fleet-500/30;
+  }
+
+  .badge--warning {
+    @apply bg-warning-500/20 text-warning-400 border border-warning-500/30;
+  }
+
+  .badge--danger {
+    @apply bg-danger-500/20 text-danger-400 border border-danger-500/30;
+  }
+
+  .badge--neutral {
+    @apply bg-surface-500/20 text-surface-400 border border-surface-500/30;
+  }
+
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm
+           transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn--primary {
+    @apply bg-fleet-600 text-white hover:bg-fleet-500 focus:ring-fleet-500
+           shadow-lg shadow-fleet-600/25 hover:shadow-fleet-500/30;
+  }
+
+  .btn--danger {
+    @apply bg-danger-600 text-white hover:bg-danger-500 focus:ring-danger-500
+           shadow-lg shadow-danger-600/25;
+  }
+
+  .btn--ghost {
+    @apply bg-surface-800/50 text-surface-300 hover:bg-surface-700 hover:text-surface-100
+           border border-surface-700/50;
+  }
+}
+
+/* ─── Leaflet Map Overrides ────────────────────────────────────────────────── */
+.leaflet-container {
+  @apply rounded-2xl;
+  background: #0f172a !important;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply bg-surface-800/95 backdrop-blur-md text-surface-100 rounded-xl border border-surface-600/40 shadow-xl;
+}
+
+.leaflet-popup-tip {
+  @apply bg-surface-800/95;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px;
+  font-family: 'Inter', sans-serif;
+}
+
+.leaflet-control-zoom {
+  @apply border-0 !important;
+}
+
+.leaflet-control-zoom a {
+  @apply bg-surface-800/80 backdrop-blur-sm text-surface-300 border border-surface-700/50 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  @apply bg-surface-700 text-white !important;
+}
+
+/* ─── SOS Pulse Animation ──────────────────────────────────────────────────── */
+@keyframes sosPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+}
+
+.sos-pulse {
+  animation: sosPulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Charging Animation ──────────────────────────────────────────────────── */
+@keyframes chargingPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.charging-pulse {
+  animation: chargingPulse 2s ease-in-out infinite;
+}
