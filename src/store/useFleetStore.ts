@@ -8,6 +8,7 @@ interface FleetState {
   // ─── Device State ──────────────────────────────────
   devices: Record<string, DeviceStatus>;
   isConnected: boolean;
+  serverClockOffset: number;
 
   // ─── Fleet Stats (from REST) ───────────────────────
   fleetStats: FleetStatsResponse | null;
@@ -24,6 +25,8 @@ interface FleetState {
   clearAlerts: () => void;
   setConnected: (connected: boolean) => void;
   setFleetStats: (stats: FleetStatsResponse) => void;
+  setAlertsSnapshot: (alerts: Alert[]) => void;
+  setServerClockOffset: (offset: number) => void;
 }
 
 /**
@@ -37,6 +40,7 @@ interface FleetState {
 export const useFleetStore = create<FleetState>((set) => ({
   devices: {},
   isConnected: false,
+  serverClockOffset: 0,
   fleetStats: null,
   alerts: [],
 
@@ -85,6 +89,10 @@ export const useFleetStore = create<FleetState>((set) => ({
   setConnected: (connected) => set({ isConnected: connected }),
 
   setFleetStats: (stats) => set({ fleetStats: stats }),
+
+  setAlertsSnapshot: (alerts) => set({ alerts }),
+
+  setServerClockOffset: (offset) => set({ serverClockOffset: offset }),
 }));
 
 // ─── Selectors (for optimized re-renders) ─────────────────────────────────

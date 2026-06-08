@@ -50,7 +50,7 @@ const Header: React.FC = () => {
             }`}
           />
           <span className="text-xs text-surface-400">
-            {isConnected ? 'Live' : 'Reconnecting...'}
+            {isConnected ? 'Backend Connected' : 'Backend Disconnected'}
           </span>
         </div>
         <div className="text-xs text-surface-500 font-mono">

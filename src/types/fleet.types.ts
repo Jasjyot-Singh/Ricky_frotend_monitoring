@@ -76,6 +76,12 @@ export interface LiveStatusDetail {
   telemetryServiceRunning: boolean;
   sosActive: boolean;
   sosSource: string | null;
+  imuAccelX: number | null;
+  imuAccelY: number | null;
+  imuAccelZ: number | null;
+  imuGyroX: number | null;
+  imuGyroY: number | null;
+  imuGyroZ: number | null;
   updatedAt: string | null;
 }
 
@@ -185,12 +191,7 @@ export interface HealthResponse {
 
 // ─── Device Commands ─────────────────────────────────────────────────────────
 
-export type CommandType =
-  | 'RESTART_PI'
-  | 'RESTART_TELEMETRY'
-  | 'SYNC_POSTERS'
-  | 'FETCH_LOGS'
-  | 'REBOOT_DEVICE';
+export type CommandType = string;
 
 export interface DeviceCommand {
   id: number;

@@ -25,12 +25,32 @@ interface AlertCardProps {
   onResolve?: (alertId: number) => void;
 }
 
+import { useFleetStore } from '../../store/useFleetStore';
+
 const AlertCard: React.FC<AlertCardProps> = React.memo(({ alert, onResolve }) => {
   const severity = getAlertSeverity(alert.type);
+  const [now, setNow] = React.useState(Date.now());
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const timeAgo = () => {
-    const diff = Date.now() - new Date(alert.createdAt).getTime();
-    const secs = Math.floor(diff / 1000);
+    const dateStr = alert.createdAt;
+    let alertTime = new Date(dateStr).getTime();
+    
+    // Check if the backend date string is missing timezone info (which Spring Boot LocalDatetime often is)
+    // and append 'Z' to instruct Javascript to parse it as UTC rather than host local timezone.
+    if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
+      const cleanStr = dateStr.replace(' ', 'T');
+      alertTime = new Date(cleanStr + 'Z').getTime();
+    }
+
+    const adjustedNow = now + serverClockOffset;
+    const diff = adjustedNow - alertTime;
+    const secs = Math.max(0, Math.floor(diff / 1000));
     if (secs < 60) return `${secs}s ago`;
     const mins = Math.floor(secs / 60);
     if (mins < 60) return `${mins}m ago`;

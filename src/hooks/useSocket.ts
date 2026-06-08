@@ -19,6 +19,8 @@ export function useSocket() {
     addAlert,
     setConnected,
     setFleetStats,
+    setAlertsSnapshot,
+    setServerClockOffset,
   } = useFleetStore();
 
   useEffect(() => {
@@ -34,25 +36,81 @@ export function useSocket() {
         ]);
         setFleetSnapshot(devices);
         setFleetStats(stats);
-        // Add existing unresolved alerts to the feed
-        for (const alert of alerts) {
-          addAlert(alert);
+        // Sync active alerts snapshot directly to display previous unresolved alerts correctly
+        setAlertsSnapshot(alerts);
+        // Since we successfully reached the backend, set connection state to true
+        setConnected(true);
+
+        // Dynamically compute the server-client clock offset based on the latest timestamps
+        let maxTime = 0;
+        for (const d of devices) {
+          if (d.lastSeen) {
+            let t = new Date(d.lastSeen).getTime();
+            if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
+              t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+            }
+            if (t > maxTime) maxTime = t;
+          }
+        }
+        for (const a of alerts) {
+          if (a.createdAt) {
+            let t = new Date(a.createdAt).getTime();
+            if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
+              t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
+            }
+            if (t > maxTime) maxTime = t;
+          }
+        }
+        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
+        if (maxTime > currentRef) {
+          const newOffset = maxTime - Date.now() + 1000;
+          setServerClockOffset(newOffset);
         }
       } catch (err) {
         console.error('Failed to fetch initial fleet data:', err);
+        // If REST call fails, backend is unreachable
+        setConnected(false);
       }
     };
 
     fetchInitialData();
 
+    // Fallback polling loop (every 5 seconds) to guarantee real-time updates
+    // even if WebSocket handshake is blocked by self-signed SSL certificate bypass constraints.
+    const fallbackPoll = setInterval(() => {
+      fetchInitialData();
+    }, 5000);
+
     // ── WebSocket event handlers ──────────────────────────
     const handleTelemetryUpdate = (data: unknown) => {
-      updateDevice(data as DeviceStatus);
+      const d = data as DeviceStatus;
+      updateDevice(d);
+      if (d.lastSeen) {
+        let t = new Date(d.lastSeen).getTime();
+        if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
+          t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+        }
+        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
+        if (t > currentRef) {
+          setServerClockOffset(t - Date.now() + 1000);
+        }
+      }
     };
 
     const handleLocationUpdate = (data: unknown) => {
       // Location updates carry full status; update the device
-      updateDevice(data as DeviceStatus);
+      const d = data as DeviceStatus;
+      updateDevice(d);
+      if (d.lastSeen) {
+        let t = new Date(d.lastSeen).getTime();
+        if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
+          t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+        }
+        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
+        if (t > currentRef) {
+          setServerClockOffset(t - Date.now() + 1000);
+        }
+      }
     };
 
     const handleSosAlert = (_data: unknown) => {
@@ -71,7 +129,18 @@ export function useSocket() {
     };
 
     const handleAlertCreated = (data: unknown) => {
-      addAlert(data as Alert);
+      const a = data as Alert;
+      addAlert(a);
+      if (a.createdAt) {
+        let t = new Date(a.createdAt).getTime();
+        if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
+          t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
+        }
+        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
+        if (t > currentRef) {
+          setServerClockOffset(t - Date.now() + 1000);
+        }
+      }
     };
 
     // ── Connection state tracking ─────────────────────────
@@ -100,6 +169,7 @@ export function useSocket() {
     }
 
     return () => {
+      clearInterval(fallbackPoll);
       fleetSocket.off('telemetry-update', handleTelemetryUpdate);
       fleetSocket.off('location-update', handleLocationUpdate);
       fleetSocket.off('sos-alert', handleSosAlert);
@@ -108,5 +178,5 @@ export function useSocket() {
       fleetSocket.off('alert-created', handleAlertCreated);
       unsubConnection();
     };
-  }, [setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats]);
+  }, [setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats, setAlertsSnapshot]);
 }

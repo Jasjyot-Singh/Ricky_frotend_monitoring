@@ -29,7 +29,7 @@ const FleetOverview: React.FC = () => {
 
         {/* Alerts — takes 1/3 width */}
         <div className="xl:col-span-1">
-          <AlertFeed maxAlerts={20} />
+          <AlertFeed maxAlerts={10} />
         </div>
       </div>
 
