@@ -36,8 +36,16 @@ export function useSocket() {
         ]);
         setFleetSnapshot(devices);
         setFleetStats(stats);
-        // Sync active alerts snapshot directly to display previous unresolved alerts correctly
-        setAlertsSnapshot(alerts);
+        // Sync active alerts snapshot and attach device location at the time
+        const alertsWithLocation = alerts.map((a) => {
+          const dev = devices.find((d) => d.deviceId === a.deviceId);
+          return {
+            ...a,
+            latitude: a.latitude !== undefined && a.latitude !== null ? a.latitude : (dev?.latitude ?? null),
+            longitude: a.longitude !== undefined && a.longitude !== null ? a.longitude : (dev?.longitude ?? null),
+          };
+        });
+        setAlertsSnapshot(alertsWithLocation);
         // Since we successfully reached the backend, set connection state to true
         setConnected(true);
 
@@ -68,8 +76,10 @@ export function useSocket() {
         }
       } catch (err) {
         console.error('Failed to fetch initial fleet data:', err);
-        // If REST call fails, backend is unreachable
-        setConnected(false);
+        // If REST call fails and WebSocket is also disconnected, backend is unreachable
+        if (!fleetSocket.connected) {
+          setConnected(false);
+        }
       }
     };
 
@@ -130,7 +140,13 @@ export function useSocket() {
 
     const handleAlertCreated = (data: unknown) => {
       const a = data as Alert;
-      addAlert(a);
+      const dev = useFleetStore.getState().devices[a.deviceId];
+      const alertWithLocation = {
+        ...a,
+        latitude: a.latitude !== undefined && a.latitude !== null ? a.latitude : (dev?.latitude ?? null),
+        longitude: a.longitude !== undefined && a.longitude !== null ? a.longitude : (dev?.longitude ?? null),
+      };
+      addAlert(alertWithLocation);
       if (a.createdAt) {
         let t = new Date(a.createdAt).getTime();
         if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
@@ -145,8 +161,8 @@ export function useSocket() {
 
     // ── Connection state tracking ─────────────────────────
     const unsubConnection = fleetSocket.onConnectionChange((connected) => {
-      setConnected(connected);
       if (connected) {
+        setConnected(true);
         // Refresh fleet data on reconnection
         fetchInitialData();
       }

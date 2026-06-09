@@ -4,6 +4,7 @@ import { isAuthenticated } from './lib/auth';
 import DashboardLayout from './components/layout/DashboardLayout';
 import FleetOverview from './pages/FleetOverview';
 import DevicePage from './pages/DevicePage';
+import AlertsPage from './pages/AlertsPage';
 import LoginPage from './pages/LoginPage';
 
 /** Auth guard — redirects to login if not authenticated */
@@ -30,6 +31,7 @@ function AppContent() {
       >
         <Route index element={<FleetOverview />} />
         <Route path="/device/:deviceId" element={<DevicePage />} />
+        <Route path="/alerts" element={<AlertsPage />} />
       </Route>
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

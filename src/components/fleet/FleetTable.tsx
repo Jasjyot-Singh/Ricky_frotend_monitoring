@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDeviceList } from '../../store/useFleetStore';
+import { useDeviceList, useFleetStore } from '../../store/useFleetStore';
 import { getMarkerState } from '../../types/fleet.types';
 import StatusBadge from './StatusBadge';
 
@@ -15,6 +15,7 @@ type SortKey =
 const FleetTable: React.FC = () => {
   const devices = useDeviceList();
   const navigate = useNavigate();
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deviceId');
   const [sortAsc, setSortAsc] = useState(true);
@@ -39,7 +40,7 @@ const FleetTable: React.FC = () => {
           break;
         case 'status': {
           const order = { sos: 0, warning: 1, healthy: 2, offline: 3 };
-          cmp = order[getMarkerState(a)] - order[getMarkerState(b)];
+          cmp = order[getMarkerState(a, serverClockOffset)] - order[getMarkerState(b, serverClockOffset)];
           break;
         }
         case 'speed':
@@ -76,11 +77,26 @@ const FleetTable: React.FC = () => {
 
   const formatTime = (iso: string | null) => {
     if (!iso) return '—';
-    const diff = Date.now() - new Date(iso).getTime();
+    let lastSeenTime = new Date(iso).getTime();
+    if (typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')) {
+      lastSeenTime = new Date(iso.replace(' ', 'T') + 'Z').getTime();
+    }
+    const adjustedNow = Date.now() + serverClockOffset;
+    const diff = adjustedNow - lastSeenTime;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Now';
     if (mins < 60) return `${mins}m`;
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  };
+
+  const isOffline = (device: any) => {
+    if (!device.lastSeen) return true;
+    let lastSeenTime = new Date(device.lastSeen).getTime();
+    if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
+      lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
+    }
+    const adjustedNow = Date.now() + serverClockOffset;
+    return (adjustedNow - lastSeenTime) > 5 * 60 * 1000;
   };
 
   return (
@@ -150,7 +166,7 @@ const FleetTable: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-surface-800/50">
             {filteredDevices.map((device) => {
-              const state = getMarkerState(device);
+              const state = getMarkerState(device, serverClockOffset);
               return (
                 <tr
                   key={device.deviceId}
@@ -228,7 +244,14 @@ const FleetTable: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-xs text-surface-500 font-mono">
-                    {formatTime(device.lastSeen)}
+                    <div className="flex flex-col">
+                      <span>{formatTime(device.lastSeen)}</span>
+                      {isOffline(device) && (
+                        <span className="text-[10px] text-danger-400 mt-0.5 font-semibold font-sans">
+                          {"⚠️ Offline (>5m)"}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

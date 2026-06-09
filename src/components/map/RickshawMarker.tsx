@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import type { DeviceStatus } from '../../types/fleet.types';
 import { getMarkerState, MARKER_COLORS } from '../../types/fleet.types';
+import { useFleetStore } from '../../store/useFleetStore';
 
 /**
  * Creates a custom circular SVG marker icon with color based on device state.
@@ -47,7 +48,8 @@ interface RickshawMarkerProps {
 
 const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onClick }) => {
   const navigate = useNavigate();
-  const state = getMarkerState(device);
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
+  const state = getMarkerState(device, serverClockOffset);
   const color = MARKER_COLORS[state];
 
   const icon = useMemo(
@@ -59,7 +61,12 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
 
   const timeSinceLastSeen = () => {
     if (!device.lastSeen) return 'Unknown';
-    const diff = Date.now() - new Date(device.lastSeen).getTime();
+    let lastSeenTime = new Date(device.lastSeen).getTime();
+    if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
+      lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
+    }
+    const adjustedNow = Date.now() + serverClockOffset;
+    const diff = adjustedNow - lastSeenTime;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;
@@ -72,6 +79,12 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
       icon={icon}
       eventHandlers={{
         click: () => onClick?.(),
+        mouseover: (e) => {
+          e.target.openPopup();
+        },
+        mouseout: (e) => {
+          e.target.closePopup();
+        },
       }}
     >
       <Popup>

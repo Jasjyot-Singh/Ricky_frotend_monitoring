@@ -130,6 +130,8 @@ export interface Alert {
   createdAt: string;
   resolved: boolean;
   resolvedAt: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /** Derive severity from alert type for UI styling */
@@ -220,7 +222,20 @@ export interface LoginResponse {
 
 export type MarkerState = 'healthy' | 'warning' | 'sos' | 'offline';
 
-export function getMarkerState(device: DeviceStatus): MarkerState {
+export function getMarkerState(device: DeviceStatus, serverClockOffset: number = 0): MarkerState {
+  if (device.lastSeen) {
+    let lastSeenTime = new Date(device.lastSeen).getTime();
+    if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
+      lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
+    }
+    const adjustedNow = Date.now() + serverClockOffset;
+    if (adjustedNow - lastSeenTime > 5 * 60 * 1000) {
+      return 'offline';
+    }
+  } else {
+    return 'offline';
+  }
+
   if (!device.online) return 'offline';
   if (device.sosActive) return 'sos';
   if (

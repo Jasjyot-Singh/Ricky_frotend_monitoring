@@ -27,6 +27,7 @@ interface FleetState {
   setFleetStats: (stats: FleetStatsResponse) => void;
   setAlertsSnapshot: (alerts: Alert[]) => void;
   setServerClockOffset: (offset: number) => void;
+  resolveAlertInStore: (alertId: number, resolvedAt: string) => void;
 }
 
 /**
@@ -93,6 +94,13 @@ export const useFleetStore = create<FleetState>((set) => ({
   setAlertsSnapshot: (alerts) => set({ alerts }),
 
   setServerClockOffset: (offset) => set({ serverClockOffset: offset }),
+
+  resolveAlertInStore: (alertId, resolvedAt) =>
+    set((state) => ({
+      alerts: state.alerts.map((a) =>
+        a.id === alertId ? { ...a, resolved: true, resolvedAt } : a
+      ),
+    })),
 }));
 
 // ─── Selectors (for optimized re-renders) ─────────────────────────────────

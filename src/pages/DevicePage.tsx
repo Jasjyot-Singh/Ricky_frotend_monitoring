@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDevice, useFleetStore } from '../store/useFleetStore';
@@ -156,7 +156,7 @@ const DevicePage: React.FC = () => {
     );
   }
 
-  const state = getMarkerState(device);
+  const state = getMarkerState(device, serverClockOffset);
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
@@ -373,7 +373,63 @@ const DevicePage: React.FC = () => {
               <Marker
                 position={[device.latitude, device.longitude]}
                 icon={icon}
-              />
+                eventHandlers={{
+                  mouseover: (e) => {
+                    e.target.openPopup();
+                  },
+                  mouseout: (e) => {
+                    e.target.closePopup();
+                  },
+                }}
+              >
+                <Popup>
+                  <div className="min-w-[220px] space-y-3 py-1">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-white text-sm">{device.deviceId}</p>
+                        <p className="text-xs text-surface-400">{device.vehicleNumber}</p>
+                      </div>
+                      <span
+                        className={`badge ${
+                          state === 'healthy'
+                            ? 'badge--success'
+                            : state === 'warning'
+                            ? 'badge--warning'
+                            : state === 'sos'
+                            ? 'badge--danger'
+                            : 'badge--neutral'
+                        }`}
+                      >
+                        {state.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-surface-500">Speed</span>
+                        <p className="text-white font-medium">{speed?.toFixed(1) ?? '—'} km/h</p>
+                      </div>
+                      <div>
+                        <span className="text-surface-500">Battery</span>
+                        <p className="text-white font-medium">
+                          {batteryPct ?? '—'}%
+                          {device.charging && ' ⚡'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-surface-500">Driver</span>
+                        <p className="text-white font-medium">{device.driverName || '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-surface-500">Last Seen</span>
+                        <p className="text-white font-medium">{timeAgo()}</p>
+                      </div>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
             )}
           </MapContainer>
         </div>
