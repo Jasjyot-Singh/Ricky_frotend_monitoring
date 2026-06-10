@@ -157,13 +157,16 @@ const DevicePage: React.FC = () => {
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
+  const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
+  const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
+
   const trailPositions: [number, number][] = locationHistory
     .filter((p) => p.latitude && p.longitude)
     .map((p) => [p.latitude, p.longitude]);
 
   const mapCenter: [number, number] =
-    device.latitude !== null && device.longitude !== null
-      ? [device.latitude, device.longitude]
+    latitude !== null && longitude !== null
+      ? [latitude, longitude]
       : [19.8762, 75.3433];
 
   const timeAgo = () => {
@@ -335,9 +338,9 @@ const DevicePage: React.FC = () => {
             )}
 
             {/* Current position marker */}
-            {device.latitude !== null && device.longitude !== null && (
+            {latitude !== null && longitude !== null && (
               <Marker
-                position={[device.latitude, device.longitude]}
+                position={[latitude, longitude]}
                 icon={icon}
                 eventHandlers={{
                   mouseover: (e) => {
