@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/shallow';
 import type { DeviceStatus, Alert, FleetStatsResponse } from '../types/fleet.types';
@@ -253,25 +254,27 @@ export const useFleetStats = () =>
   );
 
 /** Returns the latest N unresolved alerts, sorted by priority (CRITICAL -> WARNING -> INFO) and then by creation time */
-export const useLatestAlerts = (count = 20) =>
-  useFleetStore(
-    useShallow((s) => {
-      const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-      // Override alert resolved state to only count as resolved if manually clicked by operator
-      const enriched = s.alerts.map((a) => ({
-        ...a,
-        resolved: s.globalManuallyResolvedIds.has(a.id),
-        resolvedAt: s.globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
-      }));
-      const unresolved = enriched.filter((a) => !a.resolved);
-      const sorted = unresolved.sort((a, b) => {
-        const sevA = getAlertSeverity(a.type);
-        const sevB = getAlertSeverity(b.type);
-        if (priorityOrder[sevA] !== priorityOrder[sevB]) {
-          return priorityOrder[sevA] - priorityOrder[sevB];
-        }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-      return sorted.slice(0, count);
-    }),
-  );
+export const useLatestAlerts = (count = 20) => {
+  const alerts = useFleetStore((s) => s.alerts);
+  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
+
+  return useMemo(() => {
+    const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+    // Override alert resolved state to only count as resolved if manually clicked by operator
+    const enriched = alerts.map((a) => ({
+      ...a,
+      resolved: globalManuallyResolvedIds.has(a.id),
+      resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+    }));
+    const unresolved = enriched.filter((a) => !a.resolved);
+    const sorted = unresolved.sort((a, b) => {
+      const sevA = getAlertSeverity(a.type);
+      const sevB = getAlertSeverity(b.type);
+      if (priorityOrder[sevA] !== priorityOrder[sevB]) {
+        return priorityOrder[sevA] - priorityOrder[sevB];
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    return sorted.slice(0, count);
+  }, [alerts, globalManuallyResolvedIds, count]);
+};
