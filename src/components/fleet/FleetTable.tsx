@@ -99,6 +99,10 @@ const FleetTable: React.FC = () => {
     return (adjustedNow - lastSeenTime) > 5 * 60 * 1000;
   };
 
+  const anyOffline = useMemo(() => {
+    return filteredDevices.some((d) => isOffline(d));
+  }, [filteredDevices, serverClockOffset]);
+
   return (
     <div className="glass-card overflow-hidden">
       {/* Search bar */}
@@ -143,13 +147,13 @@ const FleetTable: React.FC = () => {
                 { key: 'deviceId' as SortKey, label: 'Device ID', width: 'w-28' },
                 { key: 'vehicleNumber' as SortKey, label: 'Vehicle', width: 'w-32' },
                 { key: null, label: 'Driver', width: 'w-32' },
-                { key: null, label: 'Location', width: 'w-36' },
-                { key: 'speed' as SortKey, label: 'Speed', width: 'w-20' },
-                { key: 'batteryPercentage' as SortKey, label: 'Battery', width: 'w-24' },
-                { key: null, label: 'Charging', width: 'w-20' },
-                { key: null, label: 'SOS', width: 'w-16' },
-                { key: null, label: 'GPS', width: 'w-16' },
-                { key: null, label: 'Internet', width: 'w-20' },
+                { key: null, label: anyOffline ? 'Last Location' : 'Location', width: 'w-36' },
+                { key: 'speed' as SortKey, label: anyOffline ? 'Last Speed' : 'Speed', width: 'w-20' },
+                { key: 'batteryPercentage' as SortKey, label: anyOffline ? 'Last Battery' : 'Battery', width: 'w-24' },
+                { key: null, label: anyOffline ? 'Last Charging' : 'Charging', width: 'w-20' },
+                { key: null, label: anyOffline ? 'Last SOS' : 'SOS', width: 'w-16' },
+                { key: null, label: anyOffline ? 'Last GPS' : 'GPS', width: 'w-16' },
+                { key: null, label: anyOffline ? 'Last Internet' : 'Internet', width: 'w-20' },
                 { key: 'lastSeen' as SortKey, label: 'Last Seen', width: 'w-24' },
               ].map((col, i) => (
                 <th
@@ -167,6 +171,7 @@ const FleetTable: React.FC = () => {
           <tbody className="divide-y divide-surface-800/50">
             {filteredDevices.map((device) => {
               const state = getMarkerState(device, serverClockOffset);
+              const offline = isOffline(device);
               return (
                 <tr
                   key={device.deviceId}
@@ -186,20 +191,31 @@ const FleetTable: React.FC = () => {
                     {device.driverName || '—'}
                   </td>
                   <td className="px-4 py-3.5 text-xs font-mono text-surface-400">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     {device.latitude !== null
                       ? `${device.latitude.toFixed(4)}, ${device.longitude?.toFixed(4)}`
                       : '—'}
                   </td>
                   <td className="px-4 py-3.5 text-sm text-surface-300">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     {device.speed?.toFixed(1) ?? '—'}
                     <span className="text-xs text-surface-500 ml-0.5">km/h</span>
                   </td>
                   <td className="px-4 py-3.5">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-1.5 rounded-full bg-surface-700 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            (device.batteryPercentage ?? 0) > 50
+                            offline
+                              ? 'bg-surface-500'
+                              : (device.batteryPercentage ?? 0) > 50
                               ? 'bg-fleet-500'
                               : (device.batteryPercentage ?? 0) > 20
                               ? 'bg-warning-500'
@@ -208,36 +224,52 @@ const FleetTable: React.FC = () => {
                           style={{ width: `${device.batteryPercentage ?? 0}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-surface-300">
+                      <span className={`text-xs font-medium ${offline ? 'text-surface-500 font-mono' : 'text-surface-300'}`}>
                         {device.batteryPercentage ?? '—'}%
                       </span>
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-sm">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     {device.charging ? (
-                      <span className="text-fleet-400 charging-pulse">⚡</span>
+                      <span className={offline ? 'text-surface-500' : 'text-fleet-400 charging-pulse'}>⚡</span>
                     ) : (
                       <span className="text-surface-600">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     {device.sosActive ? (
-                      <span className="badge badge--danger text-xs">SOS</span>
+                      <span className={`badge text-xs ${offline ? 'bg-surface-800 text-surface-500 border-surface-700' : 'badge--danger'}`}>SOS</span>
                     ) : (
                       <span className="text-surface-600 text-sm">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     <span
-                      className={`text-sm ${device.gpsFix ? 'text-fleet-400' : 'text-danger-400'}`}
+                      className={`text-sm ${
+                        offline ? 'text-surface-500' : device.gpsFix ? 'text-fleet-400' : 'text-danger-400'
+                      }`}
                     >
                       {device.gpsFix ? '✓' : '✗'}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
+                    {offline && (
+                      <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
+                    )}
                     <span
                       className={`text-sm ${
-                        device.internetConnected ? 'text-fleet-400' : 'text-danger-400'
+                        offline
+                          ? 'text-surface-500'
+                          : device.internetConnected ? 'text-fleet-400' : 'text-danger-400'
                       }`}
                     >
                       {device.internetConnected ? '✓' : '✗'}
@@ -246,7 +278,7 @@ const FleetTable: React.FC = () => {
                   <td className="px-4 py-3.5 text-xs text-surface-500 font-mono">
                     <div className="flex flex-col">
                       <span>{formatTime(device.lastSeen)}</span>
-                      {isOffline(device) && (
+                      {offline && (
                         <span className="text-[10px] text-danger-400 mt-0.5 font-semibold font-sans">
                           {"⚠️ Offline (>5m)"}
                         </span>

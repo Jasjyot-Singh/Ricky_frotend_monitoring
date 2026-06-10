@@ -13,8 +13,47 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const data = await api.getSosHistory(deviceId);
-        setEvents(data);
+        const [sosData, alertsData] = await Promise.all([
+          api.getSosHistory(deviceId),
+          api.getDeviceAlerts(deviceId),
+        ]);
+
+        // Read the same manual-resolve set as AlertsPage.
+        // Only alerts the OPERATOR explicitly resolved count here.
+        // Backend auto-resolutions (e.g. new SOS clearing old SOS) are ignored.
+        const manuallyResolved = (() => {
+          try {
+            const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
+            return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
+          } catch { return new Set<number>(); }
+        })();
+
+        const enrichedEvents = sosData.map((event) => {
+          // Find matching SOS alert by timestamp (within 5-minute window)
+          const matchedAlert = alertsData.find((a) => {
+            if (a.type !== 'SOS') return false;
+            const eventTime = new Date(event.timestamp).getTime();
+            const alertTime = new Date(a.createdAt).getTime();
+            return Math.abs(eventTime - alertTime) < 5 * 60 * 1000;
+          });
+
+          if (matchedAlert) {
+            // The alert is resolved in the UI ONLY if the operator manually resolved it
+            const isManuallyResolved = manuallyResolved.has(matchedAlert.id);
+            return {
+              ...event,
+              resolved: isManuallyResolved ? matchedAlert.resolved : false,
+              resolvedAt: isManuallyResolved ? (event.resolvedAt || matchedAlert.resolvedAt) : null,
+            };
+          }
+
+          // No matching alert found — keep the raw sos_event value but apply same rule:
+          // only show resolved if the sos_event itself was never auto-resolved by backend logic
+          // (treat all unmatched events as Active for safety)
+          return { ...event, resolved: false, resolvedAt: null };
+        });
+
+        setEvents(enrichedEvents);
       } catch (err) {
         console.error('Failed to fetch SOS events:', err);
       } finally {

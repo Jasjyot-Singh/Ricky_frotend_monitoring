@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Alert } from '../../types/fleet.types';
 import { getAlertSeverity } from '../../types/fleet.types';
 
@@ -28,6 +29,7 @@ interface AlertCardProps {
 import { useFleetStore } from '../../store/useFleetStore';
 
 const AlertCard: React.FC<AlertCardProps> = React.memo(({ alert, onResolve }) => {
+  const navigate = useNavigate();
   const severity = getAlertSeverity(alert.type);
   const [now, setNow] = React.useState(Date.now());
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
@@ -59,7 +61,8 @@ const AlertCard: React.FC<AlertCardProps> = React.memo(({ alert, onResolve }) =>
 
   return (
     <div
-      className={`border-l-4 rounded-r-lg px-4 py-3 animate-slide-up ${
+      onClick={() => navigate(`/alerts?id=${alert.id}`)}
+      className={`border-l-4 rounded-r-lg px-4 py-3 animate-slide-up cursor-pointer hover:bg-surface-800/20 hover:scale-[1.01] transition-all duration-200 border border-surface-800/10 ${
         severityStyles[severity] || severityStyles.INFO
       }`}
     >

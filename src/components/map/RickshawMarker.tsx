@@ -114,12 +114,23 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
               <span className="text-surface-500">Speed</span>
-              <p className="text-white font-medium">{device.speed?.toFixed(1) ?? '—'} km/h</p>
+              <p className="text-white font-medium">{device.speed != null ? `${device.speed.toFixed(1)} km/h` : '— km/h'}</p>
             </div>
             <div>
               <span className="text-surface-500">Battery</span>
-              <p className="text-white font-medium">
-                {device.batteryPercentage ?? '—'}%
+              <p
+                className="font-medium"
+                style={{
+                  color: device.batteryPercentage == null
+                    ? '#94a3b8'
+                    : device.batteryPercentage > 50
+                    ? '#22c55e'
+                    : device.batteryPercentage > 20
+                    ? '#f59e0b'
+                    : '#ef4444',
+                }}
+              >
+                {device.batteryPercentage != null ? `${device.batteryPercentage}%` : '—'}
                 {device.charging && ' ⚡'}
               </p>
             </div>

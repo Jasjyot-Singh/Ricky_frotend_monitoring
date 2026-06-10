@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useFleetStore, useDeviceList } from '../store/useFleetStore';
 import type { Alert } from '../types/fleet.types';
@@ -36,7 +37,38 @@ const AlertsPage: React.FC = () => {
   const [layoutMode, setLayoutMode] = useState<'card' | 'table' | 'grouped'>('card');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [expandedAlerts, setExpandedAlerts] = useState<Record<number, boolean>>({});
+  const [resolvedCoords, setResolvedCoords] = useState<Record<number, { latitude: number; longitude: number }>>({});
   const [resolvingId, setResolvingId] = useState<number | null>(null);
+
+  // Track which alert IDs were MANUALLY resolved by the operator in this session.
+  // Backend auto-resolutions (e.g. new SOS clearing old SOS) are ignored in the UI.
+  // Only the setter is used externally; reads go directly to sessionStorage.
+  const [, setManuallyResolvedIds] = useState<Set<number>>(() => {
+    try {
+      const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
+      return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
+    } catch {
+      return new Set<number>();
+    }
+  });
+
+  const [searchParams] = useSearchParams();
+  const alertIdParam = searchParams.get('id');
+
+  useEffect(() => {
+    if (alertIdParam && !loading && allAlerts.length > 0) {
+      const id = parseInt(alertIdParam, 10);
+      if (!isNaN(id)) {
+        setExpandedAlerts((prev) => ({ ...prev, [id]: true }));
+        setTimeout(() => {
+          const element = document.getElementById(`alert-row-${id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 150);
+      }
+    }
+  }, [alertIdParam, loading, allAlerts]);
 
   // Fetch all alerts on mount
   useEffect(() => {
@@ -44,15 +76,26 @@ const AlertsPage: React.FC = () => {
       try {
         setLoading(true);
         const data = await api.getAllAlerts();
-        // Enrich data with device locations from store if missing
-        const enriched = data.map((a) => {
-          const matchingDevice = useFleetStore.getState().devices[a.deviceId];
-          return {
-            ...a,
-            latitude: a.latitude !== undefined && a.latitude !== null ? a.latitude : (matchingDevice?.latitude ?? null),
-            longitude: a.longitude !== undefined && a.longitude !== null ? a.longitude : (matchingDevice?.longitude ?? null),
-          };
-        });
+        // Override backend resolved status:
+        // An alert is only considered resolved in the UI if the OPERATOR manually
+        // clicked Resolve this session. Backend auto-resolutions (e.g. new SOS
+        // replacing old SOS) are intentionally ignored so every alert stays
+        // visible as Active until a human dismisses it.
+        const currentResolved = (() => {
+          try {
+            const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
+            return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
+          } catch { return new Set<number>(); }
+        })();
+
+        const enriched = data.map((a) => ({
+          ...a,
+          latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
+          longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
+          // Force resolved = false unless operator manually resolved it
+          resolved: currentResolved.has(a.id) ? a.resolved : false,
+          resolvedAt: currentResolved.has(a.id) ? a.resolvedAt : null,
+        }));
         setAllAlerts(enriched);
         setError(null);
       } catch (err: any) {
@@ -65,13 +108,25 @@ const AlertsPage: React.FC = () => {
     fetchAlerts();
   }, [alertsFromStore]); // Refresh if a new alert comes via WebSockets/polling
 
-  // Handle resolving an alert
+  // Handle resolving an alert (only called by explicit operator button click)
   const handleResolve = async (alertId: number) => {
     try {
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Update local state
+        // Persist this manual resolution to sessionStorage
+        setManuallyResolvedIds((prev) => {
+          const next = new Set(prev);
+          next.add(alertId);
+          try {
+            sessionStorage.setItem(
+              'ricky_manually_resolved_alerts',
+              JSON.stringify(Array.from(next))
+            );
+          } catch { /* ignore */ }
+          return next;
+        });
+        // Update local state to show as resolved immediately
         setAllAlerts((prev) =>
           prev.map((a) =>
             a.id === alertId ? { ...a, resolved: true, resolvedAt: res.resolvedAt } : a
@@ -87,10 +142,97 @@ const AlertsPage: React.FC = () => {
     }
   };
 
-  // Toggle alert expansion
-  const toggleExpand = (id: number) => {
-    setExpandedAlerts((prev) => ({ ...prev, [id]: !prev[id] }));
+  // Toggle alert expansion and fetch location if missing
+  const toggleExpand = async (id: number) => {
+    const isExpanding = !expandedAlerts[id];
+    setExpandedAlerts((prev) => ({ ...prev, [id]: isExpanding }));
+
+    if (isExpanding) {
+      const alertObj = allAlerts.find((a) => a.id === id);
+      if (alertObj && (alertObj.latitude === null || alertObj.latitude === undefined) && !resolvedCoords[id]) {
+        try {
+          const alertTime = new Date(alertObj.createdAt).getTime();
+          const from = new Date(alertTime - 12 * 60 * 60 * 1000).toISOString();
+          const to = new Date(alertTime + 12 * 60 * 60 * 1000).toISOString();
+          const route = await api.getRouteHistory(alertObj.deviceId, from, to);
+
+          if (route && route.length > 0) {
+            let nearestPoint = route[0];
+            let minDiff = Math.abs(new Date(nearestPoint.timestamp).getTime() - alertTime);
+            for (const pt of route) {
+              const diff = Math.abs(new Date(pt.timestamp).getTime() - alertTime);
+              if (diff < minDiff) {
+                minDiff = diff;
+                nearestPoint = pt;
+              }
+            }
+            setResolvedCoords((prev) => ({
+              ...prev,
+              [id]: { latitude: nearestPoint.latitude, longitude: nearestPoint.longitude }
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to resolve nearest location for historical alert:', err);
+        }
+      }
+    }
   };
+
+  // Background pre-fetch: resolve coordinates for ALL alerts that lack lat/lng
+  // so table and grouped views always show location without requiring card expansion.
+  useEffect(() => {
+    if (allAlerts.length === 0) return;
+
+    const alertsNeedingCoords = allAlerts.filter(
+      (a) => (a.latitude === null || a.latitude === undefined) && !resolvedCoords[a.id]
+    );
+    if (alertsNeedingCoords.length === 0) return;
+
+    // Group by deviceId to batch requests
+    const byDevice: Record<string, typeof alertsNeedingCoords> = {};
+    for (const a of alertsNeedingCoords) {
+      if (!byDevice[a.deviceId]) byDevice[a.deviceId] = [];
+      byDevice[a.deviceId].push(a);
+    }
+
+    const resolveAll = async () => {
+      const updates: Record<number, { latitude: number; longitude: number }> = {};
+
+      for (const [deviceId, deviceAlerts] of Object.entries(byDevice)) {
+        // Find min/max time range covering all alerts for this device
+        const times = deviceAlerts.map((a) => new Date(a.createdAt).getTime());
+        const minTime = Math.min(...times);
+        const maxTime = Math.max(...times);
+        const from = new Date(minTime - 12 * 60 * 60 * 1000).toISOString();
+        const to = new Date(maxTime + 12 * 60 * 60 * 1000).toISOString();
+
+        try {
+          const route = await api.getRouteHistory(deviceId, from, to);
+          if (!route || route.length === 0) continue;
+
+          for (const a of deviceAlerts) {
+            const alertTime = new Date(a.createdAt).getTime();
+            let nearestPoint = route[0];
+            let minDiff = Math.abs(new Date(nearestPoint.timestamp).getTime() - alertTime);
+            for (const pt of route) {
+              const diff = Math.abs(new Date(pt.timestamp).getTime() - alertTime);
+              if (diff < minDiff) { minDiff = diff; nearestPoint = pt; }
+            }
+            if (nearestPoint.latitude && nearestPoint.longitude) {
+              updates[a.id] = { latitude: nearestPoint.latitude, longitude: nearestPoint.longitude };
+            }
+          }
+        } catch { /* skip device if route fetch fails */ }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        setResolvedCoords((prev) => ({ ...prev, ...updates }));
+      }
+    };
+
+    resolveAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allAlerts]);
 
   // Filter and search logic
   const processedAlerts = useMemo(() => {
@@ -354,11 +496,16 @@ const AlertsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800/40 text-sm">
-              {processedAlerts.map((alert) => {
+              {processedAlerts.map((rawAlert) => {
+                const alert = {
+                  ...rawAlert,
+                  latitude: resolvedCoords[rawAlert.id]?.latitude ?? rawAlert.latitude,
+                  longitude: resolvedCoords[rawAlert.id]?.longitude ?? rawAlert.longitude,
+                };
                 const severity = alert.type === 'SOS' || alert.type === 'DEVICE_OFFLINE' ? 'CRITICAL' : 'WARNING';
                 const icon = typeIcons[alert.type] || '⚠️';
                 return (
-                  <tr key={alert.id} className="hover:bg-surface-800/25 transition-all">
+                  <tr key={alert.id} id={`alert-row-${alert.id}`} className="hover:bg-surface-800/25 transition-all">
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                         severity === 'CRITICAL' ? 'bg-danger-500/10 text-danger-400' : 'bg-warning-500/10 text-warning-400'
@@ -427,13 +574,19 @@ const AlertsPage: React.FC = () => {
                   </span>
                 </h3>
                 <div className="space-y-3">
-                  {list.map((alert) => {
+                  {list.map((rawAlert) => {
+                    const alert = {
+                      ...rawAlert,
+                      latitude: resolvedCoords[rawAlert.id]?.latitude ?? rawAlert.latitude,
+                      longitude: resolvedCoords[rawAlert.id]?.longitude ?? rawAlert.longitude,
+                    };
                     const isExpanded = !!expandedAlerts[alert.id];
                     const severity = alert.type === 'SOS' || alert.type === 'DEVICE_OFFLINE' ? 'CRITICAL' : 'WARNING';
 
                     return (
                       <div
                         key={alert.id}
+                        id={`alert-row-${alert.id}`}
                         onClick={() => toggleExpand(alert.id)}
                         className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${
                           severityStyles[severity] || severityStyles.INFO
@@ -543,7 +696,12 @@ const AlertsPage: React.FC = () => {
       ) : (
         /* Original Card Layout View */
         <div className="space-y-3">
-          {processedAlerts.map((alert) => {
+          {processedAlerts.map((rawAlert) => {
+            const alert = {
+              ...rawAlert,
+              latitude: resolvedCoords[rawAlert.id]?.latitude ?? rawAlert.latitude,
+              longitude: resolvedCoords[rawAlert.id]?.longitude ?? rawAlert.longitude,
+            };
             const isExpanded = !!expandedAlerts[alert.id];
             const severity = alert.type === 'SOS' || alert.type === 'DEVICE_OFFLINE' ? 'CRITICAL' : 'WARNING';
             const icon = typeIcons[alert.type] || '⚠️';
@@ -551,6 +709,7 @@ const AlertsPage: React.FC = () => {
             return (
               <div
                 key={alert.id}
+                id={`alert-row-${alert.id}`}
                 onClick={() => toggleExpand(alert.id)}
                 className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${
                   severityStyles[severity] || severityStyles.INFO

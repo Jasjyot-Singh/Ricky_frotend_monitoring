@@ -39,13 +39,10 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
 }
 
 const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
-  { value: 'START_SOS', label: 'Start SOS', icon: '🚨' },
   { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
   { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
   { value: 'RESTART_PI', label: 'Restart Pi', icon: '🔄' },
   { value: 'FORCE_GPS_PING', label: 'Force GPS Ping', icon: '🛰' },
-  { value: 'SYNC_POSTERS', label: 'Sync Posters', icon: '📋' },
-  { value: 'FETCH_LOGS', label: 'Fetch Logs', icon: '📄' },
 ];
 
 const DevicePage: React.FC = () => {
@@ -200,17 +197,7 @@ const DevicePage: React.FC = () => {
     temp: deviceDetail?.liveStatus.cpuTemperature ?? device.system?.temp ?? 0,
   };
 
-  const hw = {
-    espConnected: deviceDetail?.liveStatus.espConnected ?? device.hardware?.espConnected ?? false,
-    gpsConnected: deviceDetail?.liveStatus.gpsConnected ?? device.hardware?.gpsConnected ?? false,
-    imuConnected: deviceDetail?.liveStatus.imuConnected ?? device.hardware?.imuConnected ?? false,
-    displayConnected: deviceDetail?.liveStatus.displayConnected ?? device.hardware?.displayConnected ?? false,
-  };
 
-  const services = {
-    posterBookingRunning: deviceDetail?.liveStatus.posterBookingRunning ?? false,
-    telemetryServiceRunning: deviceDetail?.liveStatus.telemetryServiceRunning ?? false,
-  };
 
   const imu = {
     accelX: deviceDetail?.liveStatus.imuAccelX ?? device.imu?.accelX ?? null,
@@ -312,27 +299,6 @@ const DevicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Hardware & Services Status */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'GPS Connection', connected: hw.gpsConnected },
-          { label: 'IMU Connection', connected: hw.imuConnected },
-          { label: 'Display Connection', connected: hw.displayConnected },
-          { label: 'Telemetry Daemon', connected: services.telemetryServiceRunning },
-        ].map((item) => (
-          <div key={item.label} className="glass-card p-3 flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full ${item.connected ? 'bg-fleet-400 shadow-lg shadow-fleet-400/50' : 'bg-danger-400 animate-pulse'}`} />
-            <div>
-              <p className="text-[10px] text-surface-400 uppercase tracking-wide">{item.label}</p>
-              <p className={`text-xs font-semibold mt-0.5 ${item.connected ? 'text-fleet-400' : 'text-danger-400'}`}>
-                {item.connected 
-                  ? (item.label.includes('Telemetry') ? 'Running' : 'Connected') 
-                  : (item.label.includes('Telemetry') ? 'Stopped' : 'Disconnected')}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* Live Track Map */}
       <div>

@@ -130,6 +130,9 @@ export interface Alert {
   createdAt: string;
   resolved: boolean;
   resolvedAt: string | null;
+  /** Frontend-only: lat/lng of the device at the moment the alert was captured (from live store) */
+  alertLat?: number | null;
+  alertLng?: number | null;
   latitude?: number | null;
   longitude?: number | null;
 }

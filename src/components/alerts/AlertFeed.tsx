@@ -9,16 +9,30 @@ interface AlertFeedProps {
 
 const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
   const alerts = useLatestAlerts(maxAlerts);
-  const removeAlert = useFleetStore((s) => s.removeAlert);
+  const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
 
   const handleResolve = useCallback(async (alertId: number) => {
     try {
-      await api.resolveAlert(alertId);
-      removeAlert(alertId);
+      const res = await api.resolveAlert(alertId);
+      if (res.resolved) {
+        // Write to the same sessionStorage key that AlertsPage reads,
+        // so the Alerts page and SosHistory instantly see this as operator-resolved.
+        try {
+          const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
+          const ids: number[] = stored ? JSON.parse(stored) : [];
+          if (!ids.includes(alertId)) {
+            ids.push(alertId);
+            sessionStorage.setItem('ricky_manually_resolved_alerts', JSON.stringify(ids));
+          }
+        } catch { /* ignore storage errors */ }
+
+        // Mark resolved in store (keeps it visible as resolved) instead of removing
+        resolveAlertInStore(alertId, res.resolvedAt);
+      }
     } catch (err) {
       console.error('Failed to resolve alert:', err);
     }
-  }, [removeAlert]);
+  }, [resolveAlertInStore]);
 
   // Count unresolved alerts
   const unresolvedCount = alerts.filter((a) => !a.resolved).length;
