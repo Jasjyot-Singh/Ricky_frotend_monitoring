@@ -257,7 +257,13 @@ export const useLatestAlerts = (count = 20) =>
   useFleetStore(
     useShallow((s) => {
       const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-      const unresolved = s.alerts.filter((a) => !s.globalManuallyResolvedIds.has(a.id));
+      // Override alert resolved state to only count as resolved if manually clicked by operator
+      const enriched = s.alerts.map((a) => ({
+        ...a,
+        resolved: s.globalManuallyResolvedIds.has(a.id),
+        resolvedAt: s.globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+      }));
+      const unresolved = enriched.filter((a) => !a.resolved);
       const sorted = unresolved.sort((a, b) => {
         const sevA = getAlertSeverity(a.type);
         const sevB = getAlertSeverity(b.type);
