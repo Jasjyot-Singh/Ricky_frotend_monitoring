@@ -65,18 +65,13 @@ const AlertsPage: React.FC = () => {
       try {
         setLoading(true);
         const data = await api.getAllAlerts();
-        // Override backend resolved status:
-        // An alert is only considered resolved in the UI if the OPERATOR manually
-        // clicked Resolve this session. Backend auto-resolutions (e.g. new SOS
-        // replacing old SOS) are intentionally ignored so every alert stays
-        // visible as Active until a human dismisses it.
+        // Sync resolved state from database, or check if operator manually resolved it in this session
         const enriched = data.map((a) => ({
           ...a,
           latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
           longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
-          // Force resolved = false unless operator manually resolved it
-          resolved: globalManuallyResolvedIds.has(a.id),
-          resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+          resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
+          resolvedAt: a.resolved ? (a.resolvedAt || a.createdAt) : (globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null),
         }));
         setAllAlerts(enriched);
         setError(null);

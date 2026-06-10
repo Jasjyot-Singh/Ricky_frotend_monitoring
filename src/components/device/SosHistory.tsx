@@ -30,19 +30,21 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
           });
 
           if (matchedAlert) {
-            // The alert is resolved in the UI ONLY if the operator manually resolved it
-            const isManuallyResolved = globalManuallyResolvedIds.has(matchedAlert.id);
+            // Event is resolved if matched alert is resolved in DB or manually resolved in this session
+            const isResolved = matchedAlert.resolved || globalManuallyResolvedIds.has(matchedAlert.id);
             return {
               ...event,
-              resolved: isManuallyResolved ? matchedAlert.resolved : false,
-              resolvedAt: isManuallyResolved ? (event.resolvedAt || matchedAlert.resolvedAt) : null,
+              resolved: isResolved,
+              resolvedAt: isResolved ? (event.resolvedAt || matchedAlert.resolvedAt || event.timestamp) : null,
             };
           }
 
-          // No matching alert found — keep the raw sos_event value but apply same rule:
-          // only show resolved if the sos_event itself was never auto-resolved by backend logic
-          // (treat all unmatched events as Active for safety)
-          return { ...event, resolved: false, resolvedAt: null };
+          // Fallback to the raw sos_event values from DB
+          return {
+            ...event,
+            resolved: event.resolved,
+            resolvedAt: event.resolved ? (event.resolvedAt || event.timestamp) : null,
+          };
         });
 
         setEvents(enrichedEvents);
