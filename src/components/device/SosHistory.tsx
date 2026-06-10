@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useFleetStore } from '../../store/useFleetStore';
 import type { SosEvent } from '../../types/fleet.types';
 
 interface SosHistoryProps {
@@ -9,6 +10,7 @@ interface SosHistoryProps {
 const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   const [events, setEvents] = useState<SosEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -17,16 +19,6 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
           api.getSosHistory(deviceId),
           api.getDeviceAlerts(deviceId),
         ]);
-
-        // Read the same manual-resolve set as AlertsPage.
-        // Only alerts the OPERATOR explicitly resolved count here.
-        // Backend auto-resolutions (e.g. new SOS clearing old SOS) are ignored.
-        const manuallyResolved = (() => {
-          try {
-            const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
-            return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
-          } catch { return new Set<number>(); }
-        })();
 
         const enrichedEvents = sosData.map((event) => {
           // Find matching SOS alert by timestamp (within 5-minute window)
@@ -39,7 +31,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
 
           if (matchedAlert) {
             // The alert is resolved in the UI ONLY if the operator manually resolved it
-            const isManuallyResolved = manuallyResolved.has(matchedAlert.id);
+            const isManuallyResolved = globalManuallyResolvedIds.has(matchedAlert.id);
             return {
               ...event,
               resolved: isManuallyResolved ? matchedAlert.resolved : false,
@@ -61,7 +53,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
       }
     };
     fetchEvents();
-  }, [deviceId]);
+  }, [deviceId, globalManuallyResolvedIds]);
 
   const formatDate = (iso: string) => {
     return new Date(iso).toLocaleString('en-IN', {

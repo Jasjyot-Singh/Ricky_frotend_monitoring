@@ -26,6 +26,7 @@ const AlertsPage: React.FC = () => {
   const alertsFromStore = useFleetStore((s) => s.alerts);
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
+  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const devices = useDeviceList();
   
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
@@ -39,18 +40,6 @@ const AlertsPage: React.FC = () => {
   const [expandedAlerts, setExpandedAlerts] = useState<Record<number, boolean>>({});
   const [resolvedCoords, setResolvedCoords] = useState<Record<number, { latitude: number; longitude: number }>>({});
   const [resolvingId, setResolvingId] = useState<number | null>(null);
-
-  // Track which alert IDs were MANUALLY resolved by the operator in this session.
-  // Backend auto-resolutions (e.g. new SOS clearing old SOS) are ignored in the UI.
-  // Only the setter is used externally; reads go directly to sessionStorage.
-  const [, setManuallyResolvedIds] = useState<Set<number>>(() => {
-    try {
-      const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
-      return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
-    } catch {
-      return new Set<number>();
-    }
-  });
 
   const [searchParams] = useSearchParams();
   const alertIdParam = searchParams.get('id');
@@ -81,20 +70,13 @@ const AlertsPage: React.FC = () => {
         // clicked Resolve this session. Backend auto-resolutions (e.g. new SOS
         // replacing old SOS) are intentionally ignored so every alert stays
         // visible as Active until a human dismisses it.
-        const currentResolved = (() => {
-          try {
-            const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
-            return stored ? new Set<number>(JSON.parse(stored)) : new Set<number>();
-          } catch { return new Set<number>(); }
-        })();
-
         const enriched = data.map((a) => ({
           ...a,
           latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
           longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
           // Force resolved = false unless operator manually resolved it
-          resolved: currentResolved.has(a.id) ? a.resolved : false,
-          resolvedAt: currentResolved.has(a.id) ? a.resolvedAt : null,
+          resolved: globalManuallyResolvedIds.has(a.id),
+          resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
         }));
         setAllAlerts(enriched);
         setError(null);
@@ -106,26 +88,24 @@ const AlertsPage: React.FC = () => {
       }
     };
     fetchAlerts();
-  }, [alertsFromStore]); // Refresh if a new alert comes via WebSockets/polling
+  }, [alertsFromStore, globalManuallyResolvedIds]); // Refresh if store alerts or global resolutions change
 
   // Handle resolving an alert (only called by explicit operator button click)
   const handleResolve = async (alertId: number) => {
     try {
+      const alert = allAlerts.find((a) => a.id === alertId);
+      if (!alert) return;
+
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Persist this manual resolution to sessionStorage
-        setManuallyResolvedIds((prev) => {
-          const next = new Set(prev);
-          next.add(alertId);
-          try {
-            sessionStorage.setItem(
-              'ricky_manually_resolved_alerts',
-              JSON.stringify(Array.from(next))
-            );
-          } catch { /* ignore */ }
-          return next;
-        });
+        // Sync resolution globally using device commands database log
+        try {
+          await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`);
+        } catch (err) {
+          console.warn('Failed to queue RESOLVE_ALERT command on backend:', err);
+        }
+
         // Update local state to show as resolved immediately
         setAllAlerts((prev) =>
           prev.map((a) =>

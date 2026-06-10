@@ -21,6 +21,7 @@ export function useSocket() {
     setFleetStats,
     setAlertsSnapshot,
     setServerClockOffset,
+    setGlobalManuallyResolvedIds,
   } = useFleetStore();
 
   useEffect(() => {
@@ -36,20 +37,39 @@ export function useSocket() {
         ]);
         setFleetSnapshot(devices);
         setFleetStats(stats);
-        // Sync active alerts snapshot directly to display previous unresolved alerts correctly
         setAlertsSnapshot(alerts);
-        // Since we successfully reached the backend, set connection state to true
         setConnected(true);
+
+        // Fetch command history for all devices to sync manually resolved alerts across sessions
+        try {
+          const commandHistories = await Promise.all(
+            devices.map((d) => api.getCommandHistory(d.deviceId).catch(() => []))
+          );
+          const manualResolved = new Set<number>();
+          for (const history of commandHistories) {
+            for (const cmd of history) {
+              if (cmd.command.startsWith('RESOLVE_ALERT_')) {
+                const id = parseInt(cmd.command.replace('RESOLVE_ALERT_', ''), 10);
+                if (!isNaN(id)) {
+                  manualResolved.add(id);
+                }
+              }
+            }
+          }
+          setGlobalManuallyResolvedIds(manualResolved);
+        } catch (err) {
+          console.warn('Failed to sync manually resolved alerts from command history:', err);
+        }
 
         // Dynamically compute the server-client clock offset based on the latest timestamps
         let maxTime = 0;
         for (const d of devices) {
           if (d.lastSeen) {
-            let t = new Date(d.lastSeen).getTime();
+            let lastSeenTime = new Date(d.lastSeen).getTime();
             if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
-              t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+              lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
             }
-            if (t > maxTime) maxTime = t;
+            if (lastSeenTime > maxTime) maxTime = lastSeenTime;
           }
         }
         for (const a of alerts) {

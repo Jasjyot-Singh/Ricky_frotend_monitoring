@@ -13,18 +13,17 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
   const handleResolve = useCallback(async (alertId: number) => {
     try {
+      const alert = alerts.find((a) => a.id === alertId);
+      if (!alert) return;
+
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Write to the same sessionStorage key that AlertsPage reads,
-        // so the Alerts page and SosHistory instantly see this as operator-resolved.
+        // Sync resolution globally using device commands database log
         try {
-          const stored = sessionStorage.getItem('ricky_manually_resolved_alerts');
-          const ids: number[] = stored ? JSON.parse(stored) : [];
-          if (!ids.includes(alertId)) {
-            ids.push(alertId);
-            sessionStorage.setItem('ricky_manually_resolved_alerts', JSON.stringify(ids));
-          }
-        } catch { /* ignore storage errors */ }
+          await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`);
+        } catch (err) {
+          console.warn('Failed to queue RESOLVE_ALERT command on backend:', err);
+        }
 
         // Mark resolved in store (keeps it visible as resolved) instead of removing
         resolveAlertInStore(alertId, res.resolvedAt);
@@ -32,10 +31,10 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
     } catch (err) {
       console.error('Failed to resolve alert:', err);
     }
-  }, [resolveAlertInStore]);
+  }, [alerts, resolveAlertInStore]);
 
   // Count unresolved alerts
-  const unresolvedCount = alerts.filter((a) => !a.resolved).length;
+  const unresolvedCount = alerts.length;
 
   return (
     <div className="glass-card p-5">

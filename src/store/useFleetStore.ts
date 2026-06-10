@@ -33,6 +33,7 @@ interface FleetState {
 
   // ─── Alerts ────────────────────────────────────────
   alerts: Alert[];
+  globalManuallyResolvedIds: Set<number>;
 
   // ─── Actions ───────────────────────────────────────
   setFleetSnapshot: (devices: DeviceStatus[]) => void;
@@ -46,6 +47,7 @@ interface FleetState {
   setAlertsSnapshot: (alerts: Alert[]) => void;
   setServerClockOffset: (offset: number) => void;
   resolveAlertInStore: (alertId: number, resolvedAt: string) => void;
+  setGlobalManuallyResolvedIds: (ids: Set<number>) => void;
 }
 
 /** Normalize flat LiveStatus from WebSocket update into nested DeviceStatus expected by frontend */
@@ -101,6 +103,7 @@ export const useFleetStore = create<FleetState>((set) => ({
   serverClockOffset: getPersistedClockOffset(),
   fleetStats: null,
   alerts: [],
+  globalManuallyResolvedIds: new Set<number>(),
 
   setFleetSnapshot: (devices) =>
     set(() => {
@@ -159,11 +162,18 @@ export const useFleetStore = create<FleetState>((set) => ({
   },
 
   resolveAlertInStore: (alertId, resolvedAt) =>
-    set((state) => ({
-      alerts: state.alerts.map((a) =>
-        a.id === alertId ? { ...a, resolved: true, resolvedAt } : a
-      ),
-    })),
+    set((state) => {
+      const nextSet = new Set(state.globalManuallyResolvedIds);
+      nextSet.add(alertId);
+      return {
+        globalManuallyResolvedIds: nextSet,
+        alerts: state.alerts.map((a) =>
+          a.id === alertId ? { ...a, resolved: true, resolvedAt } : a
+        ),
+      };
+    }),
+
+  setGlobalManuallyResolvedIds: (ids) => set({ globalManuallyResolvedIds: ids }),
 }));
 
 // ─── Selectors (for optimized re-renders) ─────────────────────────────────
@@ -242,12 +252,13 @@ export const useFleetStats = () =>
     }),
   );
 
-/** Returns the latest N alerts, sorted by priority (CRITICAL -> WARNING -> INFO) and then by creation time */
+/** Returns the latest N unresolved alerts, sorted by priority (CRITICAL -> WARNING -> INFO) and then by creation time */
 export const useLatestAlerts = (count = 20) =>
   useFleetStore(
     useShallow((s) => {
       const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-      const sorted = [...s.alerts].sort((a, b) => {
+      const unresolved = s.alerts.filter((a) => !s.globalManuallyResolvedIds.has(a.id));
+      const sorted = unresolved.sort((a, b) => {
         const sevA = getAlertSeverity(a.type);
         const sevB = getAlertSeverity(b.type);
         if (priorityOrder[sevA] !== priorityOrder[sevB]) {
