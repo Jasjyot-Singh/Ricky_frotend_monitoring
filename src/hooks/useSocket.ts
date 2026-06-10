@@ -33,7 +33,7 @@ export function useSocket() {
         const [devices, stats, alerts] = await Promise.all([
           api.getFleet(),
           api.getFleetStats(),
-          api.getFleetAlerts(),
+          api.getAllAlerts(),
         ]);
         setFleetSnapshot(devices);
         setFleetStats(stats);
