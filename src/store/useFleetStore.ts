@@ -53,48 +53,89 @@ interface FleetState {
 
 /** Normalize flat LiveStatus from WebSocket update into nested DeviceStatus expected by frontend */
 function normalizeLiveStatus(incoming: any, existing?: DeviceStatus): DeviceStatus {
-  if (incoming && incoming.system && incoming.hardware && incoming.imu) {
-    return incoming as DeviceStatus;
+  const isNested = incoming && incoming.system && incoming.hardware && incoming.imu;
+  
+  const deviceId = incoming.deviceId;
+  const vehicleNumber = existing?.vehicleNumber ?? incoming.vehicleNumber ?? `PILOT-${incoming.deviceId?.replace(/[^0-9]/g, '') || 'TEST'}`;
+  const driverName = existing?.driverName ?? incoming.driverName ?? 'Pilot Driver';
+  const firmwareVersion = incoming.firmwareVersion ?? existing?.firmwareVersion ?? '1.0.0';
+  const online = incoming.online !== undefined ? incoming.online : (existing?.online ?? false);
+  const lastSeen = incoming.lastSeen ?? existing?.lastSeen ?? null;
+  const latitude = incoming.latitude !== undefined ? incoming.latitude : (isNested ? incoming.latitude : (existing?.latitude ?? null));
+  const longitude = incoming.longitude !== undefined ? incoming.longitude : (isNested ? incoming.longitude : (existing?.longitude ?? null));
+  const speed = incoming.speed !== undefined ? incoming.speed : (isNested ? incoming.speed : (existing?.speed ?? null));
+  const gpsFix = incoming.gpsFix !== undefined ? incoming.gpsFix : (existing?.gpsFix ?? false);
+  const batteryPercentage = incoming.batteryPercentage !== undefined ? incoming.batteryPercentage : (existing?.batteryPercentage ?? null);
+  const batteryVoltage = incoming.batteryVoltage !== undefined ? incoming.batteryVoltage : (existing?.batteryVoltage ?? null);
+  const charging = incoming.charging !== undefined ? incoming.charging : (existing?.charging ?? false);
+  const powerSource = incoming.powerSource !== undefined ? incoming.powerSource : (existing?.powerSource ?? null);
+  const internetConnected = incoming.internetConnected !== undefined ? incoming.internetConnected : (existing?.internetConnected ?? false);
+  const sosActive = incoming.sosActive !== undefined ? incoming.sosActive : (existing?.sosActive ?? false);
+  const sosSource = incoming.sosSource !== undefined ? incoming.sosSource : (existing?.sosSource ?? null);
+
+  const system = isNested ? incoming.system : {
+    cpu: incoming.cpuUsage !== undefined ? incoming.cpuUsage : (existing?.system?.cpu ?? 0),
+    ram: incoming.ramUsage !== undefined ? incoming.ramUsage : (existing?.system?.ram ?? 0),
+    disk: incoming.diskUsage !== undefined ? incoming.diskUsage : (existing?.system?.disk ?? 0),
+    temp: incoming.cpuTemperature !== undefined ? incoming.cpuTemperature : (existing?.system?.temp ?? 0.0),
+  };
+
+  const hardware = isNested ? incoming.hardware : {
+    espConnected: incoming.espConnected !== undefined ? incoming.espConnected : (existing?.hardware?.espConnected ?? false),
+    gpsConnected: incoming.gpsConnected !== undefined ? incoming.gpsConnected : (existing?.hardware?.gpsConnected ?? false),
+    imuConnected: incoming.imuConnected !== undefined ? incoming.imuConnected : (existing?.hardware?.imuConnected ?? false),
+    displayConnected: incoming.displayConnected !== undefined ? incoming.displayConnected : (existing?.hardware?.displayConnected ?? false),
+  };
+
+  const imu = isNested ? incoming.imu : {
+    accelX: incoming.imuAccelX !== undefined ? incoming.imuAccelX : (existing?.imu?.accelX ?? 0.0),
+    accelY: incoming.imuAccelY !== undefined ? incoming.imuAccelY : (existing?.imu?.accelY ?? 0.0),
+    accelZ: incoming.imuAccelZ !== undefined ? incoming.imuAccelZ : (existing?.imu?.accelZ ?? 0.0),
+    gyroX: incoming.imuGyroX !== undefined ? incoming.imuGyroX : (existing?.imu?.gyroX ?? 0.0),
+    gyroY: incoming.imuGyroY !== undefined ? incoming.imuGyroY : (existing?.imu?.gyroY ?? 0.0),
+    gyroZ: incoming.imuGyroZ !== undefined ? incoming.imuGyroZ : (existing?.imu?.gyroZ ?? 0.0),
+  };
+
+  // Determine last telemetry time
+  let lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : Date.now();
+  if (typeof lastSeen === 'string' && !lastSeen.endsWith('Z') && !lastSeen.includes('+')) {
+    lastSeenTime = new Date(lastSeen.replace(' ', 'T') + 'Z').getTime();
+  }
+
+  const lastTelemetryTime = lastSeenTime;
+
+  let lastBatteryIncreaseTime = existing?.lastBatteryIncreaseTime ?? lastSeenTime;
+  if (batteryPercentage !== null) {
+    if (batteryPercentage >= 100) {
+      lastBatteryIncreaseTime = lastSeenTime;
+    } else if (existing && existing.batteryPercentage !== null && batteryPercentage > existing.batteryPercentage) {
+      lastBatteryIncreaseTime = lastSeenTime;
+    }
   }
 
   return {
-    deviceId: incoming.deviceId,
-    vehicleNumber: existing?.vehicleNumber ?? incoming.vehicleNumber ?? `PILOT-${incoming.deviceId?.replace(/[^0-9]/g, '') || 'TEST'}`,
-    driverName: existing?.driverName ?? incoming.driverName ?? 'Pilot Driver',
-    firmwareVersion: incoming.firmwareVersion ?? existing?.firmwareVersion ?? '1.0.0',
-    online: incoming.online !== undefined ? incoming.online : (existing?.online ?? false),
-    lastSeen: incoming.lastSeen ?? existing?.lastSeen ?? null,
-    latitude: incoming.latitude !== undefined ? incoming.latitude : (existing?.latitude ?? null),
-    longitude: incoming.longitude !== undefined ? incoming.longitude : (existing?.longitude ?? null),
-    speed: incoming.speed !== undefined ? incoming.speed : (existing?.speed ?? null),
-    gpsFix: incoming.gpsFix !== undefined ? incoming.gpsFix : (existing?.gpsFix ?? false),
-    batteryPercentage: incoming.batteryPercentage !== undefined ? incoming.batteryPercentage : (existing?.batteryPercentage ?? null),
-    batteryVoltage: incoming.batteryVoltage !== undefined ? incoming.batteryVoltage : (existing?.batteryVoltage ?? null),
-    charging: incoming.charging !== undefined ? incoming.charging : (existing?.charging ?? false),
-    powerSource: incoming.powerSource !== undefined ? incoming.powerSource : (existing?.powerSource ?? null),
-    internetConnected: incoming.internetConnected !== undefined ? incoming.internetConnected : (existing?.internetConnected ?? false),
-    sosActive: incoming.sosActive !== undefined ? incoming.sosActive : (existing?.sosActive ?? false),
-    sosSource: incoming.sosSource !== undefined ? incoming.sosSource : (existing?.sosSource ?? null),
-    system: {
-      cpu: incoming.cpuUsage !== undefined ? incoming.cpuUsage : (existing?.system?.cpu ?? 0),
-      ram: incoming.ramUsage !== undefined ? incoming.ramUsage : (existing?.system?.ram ?? 0),
-      disk: incoming.diskUsage !== undefined ? incoming.diskUsage : (existing?.system?.disk ?? 0),
-      temp: incoming.cpuTemperature !== undefined ? incoming.cpuTemperature : (existing?.system?.temp ?? 0.0),
-    },
-    hardware: {
-      espConnected: incoming.espConnected !== undefined ? incoming.espConnected : (existing?.hardware?.espConnected ?? false),
-      gpsConnected: incoming.gpsConnected !== undefined ? incoming.gpsConnected : (existing?.hardware?.gpsConnected ?? false),
-      imuConnected: incoming.imuConnected !== undefined ? incoming.imuConnected : (existing?.hardware?.imuConnected ?? false),
-      displayConnected: incoming.displayConnected !== undefined ? incoming.displayConnected : (existing?.hardware?.displayConnected ?? false),
-    },
-    imu: {
-      accelX: incoming.imuAccelX !== undefined ? incoming.imuAccelX : (existing?.imu?.accelX ?? 0.0),
-      accelY: incoming.imuAccelY !== undefined ? incoming.imuAccelY : (existing?.imu?.accelY ?? 0.0),
-      accelZ: incoming.imuAccelZ !== undefined ? incoming.imuAccelZ : (existing?.imu?.accelZ ?? 0.0),
-      gyroX: incoming.imuGyroX !== undefined ? incoming.imuGyroX : (existing?.imu?.gyroX ?? 0.0),
-      gyroY: incoming.imuGyroY !== undefined ? incoming.imuGyroY : (existing?.imu?.gyroY ?? 0.0),
-      gyroZ: incoming.imuGyroZ !== undefined ? incoming.imuGyroZ : (existing?.imu?.gyroZ ?? 0.0),
-    }
+    deviceId,
+    vehicleNumber,
+    driverName,
+    firmwareVersion,
+    online,
+    lastSeen,
+    latitude,
+    longitude,
+    speed,
+    gpsFix,
+    batteryPercentage,
+    batteryVoltage,
+    charging,
+    powerSource,
+    internetConnected,
+    sosActive,
+    sosSource,
+    system,
+    hardware,
+    imu,
+    lastTelemetryTime,
+    lastBatteryIncreaseTime,
   };
 }
 
@@ -177,29 +218,88 @@ export const useFleetStore = create<FleetState>((set) => ({
   setGlobalManuallyResolvedIds: (ids) => set({ globalManuallyResolvedIds: ids }),
 }));
 
+// ─── Dynamic Status Computation Helper ────────────────────────────────────
+
+export function computeActiveStatus(device: DeviceStatus, serverClockOffset: number): DeviceStatus {
+  if (!device) return device;
+  
+  const adjustedNow = Date.now() + serverClockOffset;
+  
+  let lastSeenTime = device.lastTelemetryTime ?? 0;
+  if (!lastSeenTime && device.lastSeen) {
+    lastSeenTime = new Date(device.lastSeen).getTime();
+    if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
+      lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
+    }
+  }
+  
+  const timeSinceLastTelemetry = lastSeenTime > 0 ? (adjustedNow - lastSeenTime) : Infinity;
+  
+  // 30 seconds telemetry activity limit
+  const isRecent = timeSinceLastTelemetry <= 30000;
+  
+  // 1. Internet active: inactive if no telemetry in 30 seconds
+  const internetActive = device.internetConnected && isRecent;
+  
+  // 2. GPS active: inactive if no telemetry in 30 seconds OR coordinates are (0,0)
+  const isZeroCoords = (device.latitude === 0 || device.latitude === null) && 
+                       (device.longitude === 0 || device.longitude === null);
+  const gpsActive = device.gpsFix && isRecent && !isZeroCoords;
+  
+  // 3. Charging active: inactive if no telemetry in 30 seconds OR battery stagnant at <100% for 30s
+  let chargingActive = device.charging && isRecent;
+  if (chargingActive && device.batteryPercentage !== null && device.batteryPercentage < 100) {
+    const lastInc = device.lastBatteryIncreaseTime ?? lastSeenTime;
+    const timeSinceIncrease = adjustedNow - lastInc;
+    if (timeSinceIncrease > 30000) {
+      chargingActive = false;
+    }
+  }
+  
+  // 4. Online active: inactive if no telemetry in 30 seconds or if coordinates are (0,0)
+  const onlineActive = device.online && isRecent && !isZeroCoords;
+  
+  return {
+    ...device,
+    online: onlineActive,
+    charging: chargingActive,
+    gpsFix: gpsActive,
+    internetConnected: internetActive,
+    hardware: {
+      ...device.hardware,
+      gpsConnected: device.hardware.gpsConnected && isRecent && !isZeroCoords,
+      espConnected: device.hardware.espConnected && isRecent,
+      displayConnected: device.hardware.displayConnected && isRecent,
+    }
+  };
+}
+
 // ─── Selectors (for optimized re-renders) ─────────────────────────────────
 
 /** Returns all devices as an array, sorted by deviceId */
 export const useDeviceList = () =>
   useFleetStore(
     useShallow((s) =>
-      Object.values(s.devices).sort((a, b) =>
-        a.deviceId.localeCompare(b.deviceId),
-      ),
+      Object.values(s.devices)
+        .map((d) => computeActiveStatus(d, s.serverClockOffset))
+        .sort((a, b) => a.deviceId.localeCompare(b.deviceId)),
     ),
   );
 
 /** Returns a single device by ID */
 export const useDevice = (deviceId: string) =>
-  useFleetStore((s) => s.devices[deviceId] ?? null);
+  useFleetStore((s) => {
+    const d = s.devices[deviceId];
+    return d ? computeActiveStatus(d, s.serverClockOffset) : null;
+  });
 
 /** Returns only devices with coordinates (for map) */
 export const useMapDevices = () =>
   useFleetStore(
     useShallow((s) =>
-      Object.values(s.devices).filter(
-        (d) => d.latitude !== null && d.longitude !== null,
-      ),
+      Object.values(s.devices)
+        .map((d) => computeActiveStatus(d, s.serverClockOffset))
+        .filter((d) => d.latitude !== null && d.longitude !== null),
     ),
   );
 
@@ -208,7 +308,6 @@ export const useFleetStats = () =>
   useFleetStore(
     useShallow((s) => {
       const devices = Object.values(s.devices);
-      const adjustedNow = Date.now() + s.serverClockOffset;
       
       let online = 0;
       let offline = 0;
@@ -228,20 +327,8 @@ export const useFleetStats = () =>
       );
 
       for (const d of devices) {
-        let isDeviceOffline = !d.online;
-        if (d.lastSeen) {
-          let lastSeenTime = new Date(d.lastSeen).getTime();
-          if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
-            lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
-          }
-          if (adjustedNow - lastSeenTime > 5 * 60 * 1000) {
-            isDeviceOffline = true;
-          }
-        } else {
-          isDeviceOffline = true;
-        }
-
-        if (isDeviceOffline) {
+        const computed = computeActiveStatus(d, s.serverClockOffset);
+        if (!computed.online) {
           offline++;
         } else {
           online++;

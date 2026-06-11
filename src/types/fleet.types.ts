@@ -48,6 +48,8 @@ export interface DeviceStatus {
   system: SystemData;
   hardware: HardwareData;
   imu: ImuData;
+  lastTelemetryTime?: number | null;
+  lastBatteryIncreaseTime?: number | null;
 }
 
 // ─── Device Detail Response (GET /api/v1/devices/{deviceId}) ─────────────────
@@ -237,7 +239,7 @@ export function getMarkerState(
       lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
     }
     const adjustedNow = Date.now() + serverClockOffset;
-    if (adjustedNow - lastSeenTime > 5 * 60 * 1000) {
+    if (adjustedNow - lastSeenTime > 30000) {
       return 'offline';
     }
   } else {

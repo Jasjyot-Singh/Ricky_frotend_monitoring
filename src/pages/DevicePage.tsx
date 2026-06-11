@@ -67,9 +67,8 @@ const DevicePage: React.FC = () => {
 
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
 
-  // Monitor freshness against local laptop system clock
   useEffect(() => {
-    const lastSeenTime = deviceDetail?.liveStatus.lastSeen ?? device.lastSeen;
+    const lastSeenTime = deviceDetail?.liveStatus.lastSeen ?? device?.lastSeen;
     if (!lastSeenTime) return;
 
     const updateTimer = () => {
@@ -86,8 +85,7 @@ const DevicePage: React.FC = () => {
     updateTimer();
     const timerInterval = setInterval(updateTimer, 1000);
     return () => clearInterval(timerInterval);
-  }, [deviceDetail?.liveStatus.lastSeen, device.lastSeen, serverClockOffset]);
-
+  }, [deviceDetail?.liveStatus.lastSeen, device?.lastSeen, serverClockOffset]);
   // Fetch location history once on mount
   useEffect(() => {
     if (!deviceId) return;

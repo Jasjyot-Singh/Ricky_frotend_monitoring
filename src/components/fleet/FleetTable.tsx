@@ -102,18 +102,12 @@ const FleetTable: React.FC = () => {
   };
 
   const isOffline = (device: any) => {
-    if (!device.lastSeen) return true;
-    let lastSeenTime = new Date(device.lastSeen).getTime();
-    if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
-      lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
-    }
-    const adjustedNow = Date.now() + serverClockOffset;
-    return (adjustedNow - lastSeenTime) > 5 * 60 * 1000;
+    return !device.online;
   };
 
   const anyOffline = useMemo(() => {
     return filteredDevices.some((d) => isOffline(d));
-  }, [filteredDevices, serverClockOffset]);
+  }, [filteredDevices]);
 
   return (
     <div className="glass-card overflow-hidden">
@@ -293,7 +287,7 @@ const FleetTable: React.FC = () => {
                       <span>{formatTime(device.lastSeen)}</span>
                       {offline && (
                         <span className="text-[10px] text-danger-400 mt-0.5 font-semibold font-sans">
-                          {"⚠️ Offline (>5m)"}
+                          {"⚠️ Offline (>30s)"}
                         </span>
                       )}
                     </div>
