@@ -77,8 +77,7 @@ const DevicePage: React.FC = () => {
         const cleanStr = lastSeenTime.replace(' ', 'T');
         parsedTime = new Date(cleanStr + 'Z').getTime();
       }
-      const adjustedNow = Date.now() + serverClockOffset;
-      const diffMs = adjustedNow - parsedTime;
+      const diffMs = Date.now() - parsedTime;
       setSecondsSinceLastSeen(Math.max(0, Math.floor(diffMs / 1000)));
     };
 
@@ -184,8 +183,7 @@ const DevicePage: React.FC = () => {
       const cleanStr = dateStr.replace(' ', 'T');
       parsedTime = new Date(cleanStr + 'Z').getTime();
     }
-    const adjustedNow = Date.now() + serverClockOffset;
-    const diff = adjustedNow - parsedTime;
+    const diff = Date.now() - parsedTime;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins} min ago`;
