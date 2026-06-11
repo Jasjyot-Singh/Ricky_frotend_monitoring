@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useDevice, useFleetStore, useActiveAlertDeviceIds } from '../store/useFleetStore';
+import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
 import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
@@ -48,7 +48,15 @@ const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] 
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const device = useDevice(deviceId || '');
-  const { sosSet, warningSet } = useActiveAlertDeviceIds();
+  const sosDeviceIds = useActiveSosDeviceIds();
+  const warningDeviceIds = useActiveWarningDeviceIds();
+
+  const { sosSet, warningSet } = useMemo(() => {
+    return {
+      sosSet: new Set(sosDeviceIds),
+      warningSet: new Set(warningDeviceIds),
+    };
+  }, [sosDeviceIds, warningDeviceIds]);
   const [deviceDetail, setDeviceDetail] = useState<DeviceDetailResponse | null>(null);
   const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);

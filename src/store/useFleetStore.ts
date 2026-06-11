@@ -291,19 +291,30 @@ export const useLatestAlerts = (count = 20) => {
   }, [alerts, globalManuallyResolvedIds, count]);
 };
 
-/** Returns sets of active SOS and Warning device IDs based on current unresolved alerts */
-export const useActiveAlertDeviceIds = () =>
+/** Returns a sorted array of active SOS device IDs based on current unresolved alerts */
+export const useActiveSosDeviceIds = () =>
   useFleetStore(
     useShallow((s) => {
       const sosSet = new Set<string>();
-      const warningSet = new Set<string>();
+      for (const a of s.alerts) {
+        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
+        if (!isResolved && a.type === 'SOS') {
+          sosSet.add(a.deviceId);
+        }
+      }
+      return Array.from(sosSet).sort();
+    })
+  );
 
+/** Returns a sorted array of active Warning device IDs based on current unresolved alerts */
+export const useActiveWarningDeviceIds = () =>
+  useFleetStore(
+    useShallow((s) => {
+      const warningSet = new Set<string>();
       for (const a of s.alerts) {
         const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
         if (!isResolved) {
-          if (a.type === 'SOS') {
-            sosSet.add(a.deviceId);
-          } else if (
+          if (
             a.type === 'LOW_BATTERY' ||
             a.type === 'GPS_FAILURE' ||
             a.type === 'INTERNET_FAILURE' ||
@@ -316,8 +327,7 @@ export const useActiveAlertDeviceIds = () =>
           }
         }
       }
-
-      return { sosSet, warningSet };
+      return Array.from(warningSet).sort();
     })
   );
 

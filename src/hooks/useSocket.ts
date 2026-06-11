@@ -12,17 +12,15 @@ import type { DeviceStatus, Alert } from '../types/fleet.types';
  * Should be called once at the app root level.
  */
 export function useSocket() {
-  const {
-    setFleetSnapshot,
-    updateDevice,
-    markDeviceOffline,
-    addAlert,
-    setConnected,
-    setFleetStats,
-    setAlertsSnapshot,
-    setServerClockOffset,
-    setGlobalManuallyResolvedIds,
-  } = useFleetStore();
+  const setFleetSnapshot = useFleetStore((s) => s.setFleetSnapshot);
+  const updateDevice = useFleetStore((s) => s.updateDevice);
+  const markDeviceOffline = useFleetStore((s) => s.markDeviceOffline);
+  const addAlert = useFleetStore((s) => s.addAlert);
+  const setConnected = useFleetStore((s) => s.setConnected);
+  const setFleetStats = useFleetStore((s) => s.setFleetStats);
+  const setAlertsSnapshot = useFleetStore((s) => s.setAlertsSnapshot);
+  const setServerClockOffset = useFleetStore((s) => s.setServerClockOffset);
+  const setGlobalManuallyResolvedIds = useFleetStore((s) => s.setGlobalManuallyResolvedIds);
 
   useEffect(() => {
     if (!isAuthenticated()) return;

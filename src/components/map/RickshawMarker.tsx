@@ -4,7 +4,7 @@ import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
 import type { DeviceStatus } from '../../types/fleet.types';
 import { getMarkerState, MARKER_COLORS } from '../../types/fleet.types';
-import { useFleetStore, useActiveAlertDeviceIds } from '../../store/useFleetStore';
+import { useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../../store/useFleetStore';
 
 /**
  * Creates a custom circular SVG marker icon with color based on device state.
@@ -49,7 +49,16 @@ interface RickshawMarkerProps {
 const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onClick }) => {
   const navigate = useNavigate();
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
-  const { sosSet, warningSet } = useActiveAlertDeviceIds();
+  const sosDeviceIds = useActiveSosDeviceIds();
+  const warningDeviceIds = useActiveWarningDeviceIds();
+
+  const { sosSet, warningSet } = useMemo(() => {
+    return {
+      sosSet: new Set(sosDeviceIds),
+      warningSet: new Set(warningDeviceIds),
+    };
+  }, [sosDeviceIds, warningDeviceIds]);
+
   const state = getMarkerState(device, serverClockOffset, sosSet, warningSet);
   const color = MARKER_COLORS[state];
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDeviceList, useFleetStore, useActiveAlertDeviceIds } from '../../store/useFleetStore';
+import { useDeviceList, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../../store/useFleetStore';
 import { getMarkerState } from '../../types/fleet.types';
 import StatusBadge from './StatusBadge';
 
@@ -16,7 +16,16 @@ const FleetTable: React.FC = () => {
   const devices = useDeviceList();
   const navigate = useNavigate();
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
-  const { sosSet, warningSet } = useActiveAlertDeviceIds();
+  const sosDeviceIds = useActiveSosDeviceIds();
+  const warningDeviceIds = useActiveWarningDeviceIds();
+
+  const { sosSet, warningSet } = useMemo(() => {
+    return {
+      sosSet: new Set(sosDeviceIds),
+      warningSet: new Set(warningDeviceIds),
+    };
+  }, [sosDeviceIds, warningDeviceIds]);
+
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deviceId');
   const [sortAsc, setSortAsc] = useState(true);
