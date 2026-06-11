@@ -1,15 +1,14 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
-import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
+import type { LocationPoint, DeviceDetailResponse } from '../types/fleet.types';
 import { api } from '../lib/api';
 import StatusBadge from '../components/fleet/StatusBadge';
 import SystemHealthCharts from '../components/device/SystemHealthCharts';
-import SosHistory from '../components/device/SosHistory';
 import RemoteAccessPanel from '../components/device/RemoteAccessPanel';
 
 function createDetailMarkerIcon(color: string): L.DivIcon {
@@ -38,13 +37,6 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
   });
 }
 
-const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
-  { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
-  { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
-  { value: 'RESTART_PI', label: 'Restart Pi', icon: '🔄' },
-  { value: 'FORCE_GPS_PING', label: 'Force GPS Ping', icon: '🛰' },
-];
-
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const rawDevice = useDevice(deviceId || '');
@@ -60,11 +52,8 @@ const DevicePage: React.FC = () => {
     };
   }, [sosDeviceIds, warningDeviceIds]);
   const [deviceDetail, setDeviceDetail] = useState<DeviceDetailResponse | null>(null);
-  const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [sendingCommand, setSendingCommand] = useState(false);
-  const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
 
   useEffect(() => {
@@ -104,44 +93,22 @@ const DevicePage: React.FC = () => {
     fetchHistory();
   }, [deviceId]);
 
-  // Poll for Device Details and Command History every 5 seconds
+  // Poll for Device Details every 5 seconds
   useEffect(() => {
     if (!deviceId) return;
 
     const fetchLiveData = async () => {
       try {
-        const [detailData, commandsData] = await Promise.all([
-          api.getDevice(deviceId),
-          api.getCommandHistory(deviceId),
-        ]);
+        const detailData = await api.getDevice(deviceId);
         setDeviceDetail(detailData);
-        setCommandHistory(commandsData);
       } catch (err) {
-        console.error('Failed to fetch live device details or command history:', err);
+        console.error('Failed to fetch live device details:', err);
       }
     };
 
     fetchLiveData(); // initial call
     const interval = setInterval(fetchLiveData, 5000);
     return () => clearInterval(interval);
-  }, [deviceId]);
-
-  const handleSendCommand = useCallback(async (command: CommandType) => {
-    if (!deviceId) return;
-    setSendingCommand(true);
-    setCommandStatus(null);
-    try {
-      const res = await api.sendCommand(deviceId, command);
-      setCommandStatus(`✅ ${res.message} (ID: ${res.commandId})`);
-      // Immediately refresh command history
-      const freshCommands = await api.getCommandHistory(deviceId);
-      setCommandHistory(freshCommands);
-    } catch (err) {
-      setCommandStatus(`❌ ${err instanceof Error ? err.message : 'Failed to send command'}`);
-    } finally {
-      setSendingCommand(false);
-      setTimeout(() => setCommandStatus(null), 5000);
-    }
   }, [deviceId]);
 
   if (!device) {

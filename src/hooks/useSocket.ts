@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { fleetSocket } from '../lib/socket';
 import { useFleetStore } from '../store/useFleetStore';
 import { api } from '../lib/api';
-import { isAuthenticated } from '../lib/auth';
 import type { DeviceStatus, Alert } from '../types/fleet.types';
 
 /**
