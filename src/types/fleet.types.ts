@@ -225,7 +225,12 @@ export interface LoginResponse {
 
 export type MarkerState = 'healthy' | 'warning' | 'sos' | 'offline';
 
-export function getMarkerState(device: DeviceStatus, serverClockOffset: number = 0): MarkerState {
+export function getMarkerState(
+  device: DeviceStatus,
+  serverClockOffset: number = 0,
+  activeSosDeviceIds?: Set<string>,
+  activeWarningDeviceIds?: Set<string>
+): MarkerState {
   if (device.lastSeen) {
     let lastSeenTime = new Date(device.lastSeen).getTime();
     if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
@@ -240,6 +245,15 @@ export function getMarkerState(device: DeviceStatus, serverClockOffset: number =
   }
 
   if (!device.online) return 'offline';
+
+  // Prioritize active alerts lists if provided by components
+  if (activeSosDeviceIds !== undefined || activeWarningDeviceIds !== undefined) {
+    if (activeSosDeviceIds?.has(device.deviceId)) return 'sos';
+    if (activeWarningDeviceIds?.has(device.deviceId)) return 'warning';
+    return 'healthy';
+  }
+
+  // Fallback to telemetry-based flags if lists are not available
   if (device.sosActive) return 'sos';
   if (
     (device.batteryPercentage !== null && device.batteryPercentage < 20) ||

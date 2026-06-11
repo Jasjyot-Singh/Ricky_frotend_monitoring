@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDeviceList, useFleetStore } from '../../store/useFleetStore';
+import { useDeviceList, useFleetStore, useActiveAlertDeviceIds } from '../../store/useFleetStore';
 import { getMarkerState } from '../../types/fleet.types';
 import StatusBadge from './StatusBadge';
 
@@ -16,6 +16,7 @@ const FleetTable: React.FC = () => {
   const devices = useDeviceList();
   const navigate = useNavigate();
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
+  const { sosSet, warningSet } = useActiveAlertDeviceIds();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deviceId');
   const [sortAsc, setSortAsc] = useState(true);
@@ -40,7 +41,9 @@ const FleetTable: React.FC = () => {
           break;
         case 'status': {
           const order = { sos: 0, warning: 1, healthy: 2, offline: 3 };
-          cmp = order[getMarkerState(a, serverClockOffset)] - order[getMarkerState(b, serverClockOffset)];
+          cmp =
+            order[getMarkerState(a, serverClockOffset, sosSet, warningSet)] -
+            order[getMarkerState(b, serverClockOffset, sosSet, warningSet)];
           break;
         }
         case 'speed':
@@ -58,7 +61,7 @@ const FleetTable: React.FC = () => {
     });
 
     return filtered;
-  }, [devices, search, sortKey, sortAsc]);
+  }, [devices, search, sortKey, sortAsc, sosSet, warningSet]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -170,8 +173,9 @@ const FleetTable: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-surface-800/50">
             {filteredDevices.map((device) => {
-              const state = getMarkerState(device, serverClockOffset);
+              const state = getMarkerState(device, serverClockOffset, sosSet, warningSet);
               const offline = isOffline(device);
+              const hasActiveSos = sosSet.has(device.deviceId);
               return (
                 <tr
                   key={device.deviceId}
@@ -243,7 +247,7 @@ const FleetTable: React.FC = () => {
                     {offline && (
                       <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>
                     )}
-                    {device.sosActive ? (
+                    {hasActiveSos ? (
                       <span className={`badge text-xs ${offline ? 'bg-surface-800 text-surface-500 border-surface-700' : 'badge--danger'}`}>SOS</span>
                     ) : (
                       <span className="text-surface-600 text-sm">—</span>

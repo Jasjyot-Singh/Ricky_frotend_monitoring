@@ -291,3 +291,33 @@ export const useLatestAlerts = (count = 20) => {
   }, [alerts, globalManuallyResolvedIds, count]);
 };
 
+/** Returns sets of active SOS and Warning device IDs based on current unresolved alerts */
+export const useActiveAlertDeviceIds = () =>
+  useFleetStore(
+    useShallow((s) => {
+      const sosSet = new Set<string>();
+      const warningSet = new Set<string>();
+
+      for (const a of s.alerts) {
+        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
+        if (!isResolved) {
+          if (a.type === 'SOS') {
+            sosSet.add(a.deviceId);
+          } else if (
+            a.type === 'LOW_BATTERY' ||
+            a.type === 'GPS_FAILURE' ||
+            a.type === 'INTERNET_FAILURE' ||
+            a.type === 'ESP_DISCONNECTED' ||
+            a.type === 'DISPLAY_FAILURE' ||
+            a.type === 'POSTER_SERVICE_DOWN' ||
+            a.type === 'TELEMETRY_SERVICE_DOWN'
+          ) {
+            warningSet.add(a.deviceId);
+          }
+        }
+      }
+
+      return { sosSet, warningSet };
+    })
+  );
+

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useDevice, useFleetStore } from '../store/useFleetStore';
+import { useDevice, useFleetStore, useActiveAlertDeviceIds } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
 import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
@@ -48,6 +48,7 @@ const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] 
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const device = useDevice(deviceId || '');
+  const { sosSet, warningSet } = useActiveAlertDeviceIds();
   const [deviceDetail, setDeviceDetail] = useState<DeviceDetailResponse | null>(null);
   const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
@@ -153,7 +154,7 @@ const DevicePage: React.FC = () => {
     );
   }
 
-  const state = getMarkerState(device, serverClockOffset);
+  const state = getMarkerState(device, serverClockOffset, sosSet, warningSet);
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
