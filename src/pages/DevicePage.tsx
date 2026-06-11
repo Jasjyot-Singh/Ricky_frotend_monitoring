@@ -481,10 +481,7 @@ const DevicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* SOS Events Section */}
-      <div>
-        <SosHistory deviceId={device.deviceId} />
-      </div>
+      {/* SOS Events Section (Removed from UI) */}
 
       {/* Remote Commands & History */}
       <div>
