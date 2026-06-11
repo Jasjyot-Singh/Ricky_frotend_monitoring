@@ -61,13 +61,18 @@ export function useSocket() {
 
         // Dynamically compute the server-client clock offset based on the latest timestamps
         let maxOnlineTime = 0;
+        const now = Date.now();
         for (const d of devices) {
           if (d.online && d.lastSeen) {
             let lastSeenTime = new Date(d.lastSeen).getTime();
             if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
               lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
             }
-            if (lastSeenTime > maxOnlineTime) maxOnlineTime = lastSeenTime;
+            // Only calibrate if the device sent telemetry within the last 2 minutes.
+            // This prevents a stale 'online: true' DB row from skewing the clock back.
+            if (Math.abs(now - lastSeenTime) < 2 * 60 * 1000) {
+              if (lastSeenTime > maxOnlineTime) maxOnlineTime = lastSeenTime;
+            }
           }
         }
 
@@ -83,7 +88,10 @@ export function useSocket() {
               if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
                 lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
               }
-              if (lastSeenTime > maxTime) maxTime = lastSeenTime;
+              // Only consider fallback if it is recent (e.g. within the last 5 minutes)
+              if (Math.abs(now - lastSeenTime) < 5 * 60 * 1000 && lastSeenTime > maxTime) {
+                maxTime = lastSeenTime;
+              }
             }
           }
           for (const a of alerts) {
@@ -92,7 +100,9 @@ export function useSocket() {
               if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
                 t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
               }
-              if (t > maxTime) maxTime = t;
+              if (Math.abs(now - t) < 5 * 60 * 1000 && t > maxTime) {
+                maxTime = t;
+              }
             }
           }
           const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
