@@ -179,4 +179,12 @@ export const api = {
   /** Get command history for a device */
   getCommandHistory: (deviceId: string) =>
     apiFetch<DeviceCommand[]>(`/api/v1/devices/${deviceId}/commands`),
+
+  // ── Telemetry ─────────────────────────────────────────────
+  /** Submit telemetry payload */
+  submitTelemetry: (payload: any) =>
+    apiFetch<{ success: boolean; message: string }>('/api/v1/telemetry', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };

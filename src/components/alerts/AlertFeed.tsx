@@ -25,6 +25,14 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
           await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`);
           if (alert.type === 'SOS') {
             await api.sendCommand(alert.deviceId, 'RESET_SOS');
+            try {
+              await api.submitTelemetry({
+                deviceId: alert.deviceId,
+                sos: { active: false, source: null }
+              });
+            } catch (telemetryErr) {
+              console.warn('Failed to submit transition telemetry to resolve SOS in DB:', telemetryErr);
+            }
           }
         } catch (err) {
           console.warn('Failed to queue RESOLVE_ALERT command on backend:', err);
