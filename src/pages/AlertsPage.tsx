@@ -94,16 +94,6 @@ const AlertsPage: React.FC = () => {
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Sync resolution globally using device commands database log
-        try {
-          await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`);
-          if (alert.type === 'SOS') {
-            await api.sendCommand(alert.deviceId, 'RESET_SOS');
-          }
-        } catch (err) {
-          console.warn('Failed to queue RESOLVE_ALERT command on backend:', err);
-        }
-
         // Update local state to show as resolved immediately
         setAllAlerts((prev) =>
           prev.map((a) =>

@@ -20,16 +20,6 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Sync resolution globally using device commands database log
-        try {
-          await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`);
-          if (alert.type === 'SOS') {
-            await api.sendCommand(alert.deviceId, 'RESET_SOS');
-          }
-        } catch (err) {
-          console.warn('Failed to queue RESOLVE_ALERT command on backend:', err);
-        }
-
         // Mark resolved in store (keeps it visible as resolved) instead of removing
         resolveAlertInStore(alertId, res.resolvedAt);
       }
