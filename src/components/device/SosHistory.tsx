@@ -7,6 +7,18 @@ interface SosHistoryProps {
   deviceId: string;
 }
 
+const parseAsUTC = (dateStr: string) => {
+  if (!dateStr) return 0;
+  let clean = dateStr;
+  if (typeof clean === 'string') {
+    clean = clean.trim().replace(' ', 'T');
+    if (!clean.endsWith('Z') && !clean.includes('+') && !clean.includes('-')) {
+      clean += 'Z';
+    }
+  }
+  return new Date(clean).getTime();
+};
+
 const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   const [events, setEvents] = useState<SosEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,10 +37,10 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
         const matchedAlertIds = new Set<number>();
 
         const enrichedEvents = sosData.map((event) => {
-          // Find matching SOS alert by timestamp (within 5-minute window)
+          // Find matching SOS alert by UTC timestamp (within 5-minute window)
           const matchedAlert = sosAlerts.find((a) => {
-            const eventTime = new Date(event.timestamp).getTime();
-            const alertTime = new Date(a.createdAt).getTime();
+            const eventTime = parseAsUTC(event.timestamp);
+            const alertTime = parseAsUTC(a.createdAt);
             return Math.abs(eventTime - alertTime) < 5 * 60 * 1000;
           });
 
@@ -68,7 +80,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
           });
 
         const allMergedEvents = [...enrichedEvents, ...unmatchedEvents];
-        allMergedEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        allMergedEvents.sort((a, b) => parseAsUTC(b.timestamp) - parseAsUTC(a.timestamp));
 
         setEvents(allMergedEvents);
       } catch (err) {
@@ -81,7 +93,11 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   }, [deviceId, globalManuallyResolvedIds, alertsFromStore]);
 
   const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleString('en-IN', {
+    let clean = iso;
+    if (typeof clean === 'string' && !clean.endsWith('Z') && !clean.includes('+') && !clean.includes('-')) {
+      clean = clean.trim().replace(' ', 'T') + 'Z';
+    }
+    return new Date(clean).toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -115,7 +131,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {events.map((event, idx) => (
+          {events.map((event, index) => (
             <div
               key={event.id}
               className={`glass-card p-4 flex items-center justify-between ${
@@ -128,7 +144,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
                 </span>
                 <div>
                   <p className="text-sm text-surface-200 font-medium">
-                    SOS Event #{events.length - idx}
+                    SOS Event #{events.length - index}
                     {event.source && (
                       <span className="text-surface-500 ml-2">Source: {event.source}</span>
                     )}

@@ -1,13 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFleetStore, useFleetStats } from '../../store/useFleetStore';
+import { useFleetStore } from '../../store/useFleetStore';
 import { clearTokens } from '../../lib/auth';
 import { fleetSocket } from '../../lib/socket';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const isConnected = useFleetStore((s) => s.isConnected);
-  const stats = useFleetStats();
 
   const handleLogout = () => {
     clearTokens();
@@ -17,16 +16,8 @@ const Header: React.FC = () => {
 
   return (
     <header className="h-16 bg-surface-900/50 backdrop-blur-md border-b border-surface-700/30 flex items-center justify-between px-6 sticky top-0 z-30">
-      {/* Left: Fleet stats pills */}
+      {/* Left: Empty placeholder to maintain flex layout */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-800/50 border border-surface-700/40">
-          <span className="text-xs text-surface-400">Total:</span>
-          <span className="text-sm font-semibold text-white">{stats.total}</span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-fleet-500/10 border border-fleet-500/20">
-          <span className="status-dot status-dot--online" />
-          <span className="text-sm font-semibold text-fleet-400">{stats.online}</span>
-        </div>
       </div>
 
       {/* Right: Connection status + time + logout */}

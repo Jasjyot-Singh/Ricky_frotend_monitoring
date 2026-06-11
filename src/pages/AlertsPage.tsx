@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import { useFleetStore } from '../store/useFleetStore';
+import { useFleetStore, useDeviceList } from '../store/useFleetStore';
 import type { Alert } from '../types/fleet.types';
 
 const typeIcons: Record<string, string> = {
@@ -27,16 +27,16 @@ const AlertsPage: React.FC = () => {
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
   const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
+  const devices = useDeviceList();
+  
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Constants replacing removed UI controls
-  const filter = 'ALL' as 'ALL' | 'ACTIVE' | 'RESOLVED';
-  const selectedDeviceId = 'ALL' as string;
-  const search = '' as string;
-  const layoutMode = 'card' as 'card' | 'table' | 'grouped';
-  const sortBy = 'newest' as 'newest' | 'oldest';
+  const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'RESOLVED'>('ALL');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('ALL');
+  const [search, setSearch] = useState('');
+  const [layoutMode, setLayoutMode] = useState<'card' | 'table' | 'grouped'>('card');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [expandedAlerts, setExpandedAlerts] = useState<Record<number, boolean>>({});
   const [resolvedCoords, setResolvedCoords] = useState<Record<number, { latitude: number; longitude: number }>>({});
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -287,7 +287,136 @@ const AlertsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Device-Wise Horizontal Scroll Selector */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Filter by Active Device</label>
+        <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-surface-700 scrollbar-track-transparent">
+          <button
+            onClick={() => setSelectedDeviceId('ALL')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+              selectedDeviceId === 'ALL'
+                ? 'bg-fleet-600/30 text-fleet-400 border-fleet-500/30 shadow-md'
+                : 'bg-surface-800/40 text-surface-400 border-surface-700/30 hover:text-surface-200 hover:border-surface-600'
+            }`}
+          >
+            All Devices
+          </button>
+          {devices.map((d) => (
+            <button
+              key={d.deviceId}
+              onClick={() => setSelectedDeviceId(d.deviceId)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                selectedDeviceId === d.deviceId
+                  ? 'bg-fleet-600/30 text-fleet-400 border-fleet-500/30 shadow-md'
+                  : 'bg-surface-800/40 text-surface-400 border-surface-700/30 hover:text-surface-200 hover:border-surface-600'
+              }`}
+            >
+              {d.deviceId}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {/* Filters, Customize, Sort, Layout & Search Toolbar */}
+      <div className="glass-card p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+        {/* Toggle Filters & Sort & Layout Mode controls */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Status Filter */}
+          <div className="flex bg-surface-900/50 p-1 rounded-xl border border-surface-800">
+            {(['ALL', 'ACTIVE', 'RESOLVED'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setFilter(opt)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all ${
+                  filter === opt
+                    ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                    : 'text-surface-400 hover:text-surface-200'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Controller */}
+          <div className="flex bg-surface-900/50 p-1 rounded-xl border border-surface-800">
+            <button
+              onClick={() => setSortBy('newest')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                sortBy === 'newest'
+                  ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                  : 'text-surface-400 hover:text-surface-200'
+              }`}
+            >
+              Newest First
+            </button>
+            <button
+              onClick={() => setSortBy('oldest')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                sortBy === 'oldest'
+                  ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                  : 'text-surface-400 hover:text-surface-200'
+              }`}
+            >
+              Oldest First
+            </button>
+          </div>
+
+          {/* Layout Controller */}
+          <div className="flex bg-surface-900/50 p-1 rounded-xl border border-surface-800 font-medium">
+            <button
+              onClick={() => setLayoutMode('card')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                layoutMode === 'card'
+                  ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                  : 'text-surface-400 hover:text-surface-200'
+              }`}
+            >
+              🗂️ Cards
+            </button>
+            <button
+              onClick={() => setLayoutMode('table')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                layoutMode === 'table'
+                  ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                  : 'text-surface-400 hover:text-surface-200'
+              }`}
+            >
+              📋 Table
+            </button>
+            <button
+              onClick={() => setLayoutMode('grouped')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                layoutMode === 'grouped'
+                  ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
+                  : 'text-surface-400 hover:text-surface-200'
+              }`}
+            >
+              📂 Grouped
+            </button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full lg:w-72">
+          <input
+            type="text"
+            placeholder="Search by Type, message..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-surface-800/50 border border-surface-700/50 rounded-xl px-4 py-2.5 text-sm text-surface-200 placeholder-surface-500
+                       focus:outline-none focus:ring-2 focus:ring-fleet-500/30 focus:border-fleet-500/50 transition-all"
+          />
+          <svg
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </div>
 
       {/* Main Diagnostics Display Container */}
       {loading ? (
