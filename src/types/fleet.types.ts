@@ -239,7 +239,13 @@ export function getMarkerState(
       lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
     }
     const adjustedNow = Date.now() + serverClockOffset;
-    if (adjustedNow - lastSeenTime > 30000) {
+    const timeSinceLastTelemetry = adjustedNow - lastSeenTime;
+    const isRecent = timeSinceLastTelemetry <= 30000;
+    const isRecent5Min = timeSinceLastTelemetry <= 300000;
+    const isZeroCoords = (device.latitude === 0 || device.latitude === null) && 
+                         (device.longitude === 0 || device.longitude === null);
+                         
+    if (!isRecent5Min || (isZeroCoords && !isRecent)) {
       return 'offline';
     }
   } else {

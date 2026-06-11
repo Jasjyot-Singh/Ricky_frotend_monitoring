@@ -255,10 +255,11 @@ export function computeActiveStatus(device: DeviceStatus, serverClockOffset: num
       chargingActive = false;
     }
   }
-  
-  // 4. Online active: inactive if no telemetry in 30 seconds or if coordinates are (0,0)
-  const onlineActive = device.online && isRecent && !isZeroCoords;
-  
+
+  // 4. Online active: offline if no telemetry in 5 minutes (300,000 ms), OR if coordinates are (0,0) and no data for 30s
+  const isRecent5Min = timeSinceLastTelemetry <= 300000;
+  const onlineActive = device.online && isRecent5Min && !(isZeroCoords && !isRecent);
+
   return {
     ...device,
     online: onlineActive,
