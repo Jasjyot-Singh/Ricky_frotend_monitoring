@@ -75,7 +75,7 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
     if (typeof device.lastSeen === 'string' && !device.lastSeen.endsWith('Z') && !device.lastSeen.includes('+')) {
       lastSeenTime = new Date(device.lastSeen.replace(' ', 'T') + 'Z').getTime();
     }
-    const diff = Date.now() - lastSeenTime;
+    const diff = (Date.now() + serverClockOffset) - lastSeenTime;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;

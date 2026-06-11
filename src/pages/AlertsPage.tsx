@@ -24,6 +24,7 @@ const severityStyles: Record<string, string> = {
 
 const AlertsPage: React.FC = () => {
   const alertsFromStore = useFleetStore((s) => s.alerts);
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
   const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const devices = useDeviceList();
@@ -256,7 +257,7 @@ const AlertsPage: React.FC = () => {
     if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.includes('+')) {
       alertTime = new Date(dateStr.replace(' ', 'T') + 'Z').getTime();
     }
-    const diff = Date.now() - alertTime;
+    const diff = (Date.now() + serverClockOffset) - alertTime;
     const secs = Math.max(0, Math.floor(diff / 1000));
     if (secs < 60) return `${secs}s ago`;
     const mins = Math.floor(secs / 60);

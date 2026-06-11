@@ -93,7 +93,7 @@ const FleetTable: React.FC = () => {
     if (typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')) {
       lastSeenTime = new Date(iso.replace(' ', 'T') + 'Z').getTime();
     }
-    const diff = Date.now() - lastSeenTime;
+    const diff = (Date.now() + serverClockOffset) - lastSeenTime;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'Now';
     if (mins < 60) return `${mins}m`;

@@ -26,12 +26,13 @@ interface AlertCardProps {
   onResolve?: (alertId: number) => void;
 }
 
-
+import { useFleetStore } from '../../store/useFleetStore';
 
 const AlertCard: React.FC<AlertCardProps> = React.memo(({ alert, onResolve }) => {
   const navigate = useNavigate();
   const severity = getAlertSeverity(alert.type);
   const [now, setNow] = React.useState(Date.now());
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5000);
@@ -49,7 +50,7 @@ const AlertCard: React.FC<AlertCardProps> = React.memo(({ alert, onResolve }) =>
       alertTime = new Date(cleanStr + 'Z').getTime();
     }
 
-    const diff = now - alertTime;
+    const diff = (now + serverClockOffset) - alertTime;
     const secs = Math.max(0, Math.floor(diff / 1000));
     if (secs < 60) return `${secs}s ago`;
     const mins = Math.floor(secs / 60);
