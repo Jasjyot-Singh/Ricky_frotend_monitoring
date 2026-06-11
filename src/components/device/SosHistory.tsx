@@ -115,7 +115,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {events.map((event) => (
+          {events.map((event, idx) => (
             <div
               key={event.id}
               className={`glass-card p-4 flex items-center justify-between ${
@@ -128,7 +128,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
                 </span>
                 <div>
                   <p className="text-sm text-surface-200 font-medium">
-                    SOS Event #{event.id}
+                    SOS Event #{events.length - idx}
                     {event.source && (
                       <span className="text-surface-500 ml-2">Source: {event.source}</span>
                     )}
