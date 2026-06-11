@@ -62,29 +62,45 @@ export function useSocket() {
         }
 
         // Dynamically compute the server-client clock offset based on the latest timestamps
-        let maxTime = 0;
+        let maxOnlineTime = 0;
         for (const d of devices) {
-          if (d.lastSeen) {
+          if (d.online && d.lastSeen) {
             let lastSeenTime = new Date(d.lastSeen).getTime();
             if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
               lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
             }
-            if (lastSeenTime > maxTime) maxTime = lastSeenTime;
+            if (lastSeenTime > maxOnlineTime) maxOnlineTime = lastSeenTime;
           }
         }
-        for (const a of alerts) {
-          if (a.createdAt) {
-            let t = new Date(a.createdAt).getTime();
-            if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
-              t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
+
+        if (maxOnlineTime > 0) {
+          // If a device is currently online, synchronize client-server offset perfectly based on its heartbeat
+          setServerClockOffset(maxOnlineTime - Date.now() + 1000);
+        } else {
+          // Fallback: if all devices are offline, calibrate only if client clock is behind (to avoid shifting to past dates)
+          let maxTime = 0;
+          for (const d of devices) {
+            if (d.lastSeen) {
+              let lastSeenTime = new Date(d.lastSeen).getTime();
+              if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
+                lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+              }
+              if (lastSeenTime > maxTime) maxTime = lastSeenTime;
             }
-            if (t > maxTime) maxTime = t;
           }
-        }
-        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
-        if (maxTime > currentRef) {
-          const newOffset = maxTime - Date.now() + 1000;
-          setServerClockOffset(newOffset);
+          for (const a of alerts) {
+            if (a.createdAt) {
+              let t = new Date(a.createdAt).getTime();
+              if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
+                t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
+              }
+              if (t > maxTime) maxTime = t;
+            }
+          }
+          const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
+          if (maxTime > currentRef) {
+            setServerClockOffset(maxTime - Date.now() + 1000);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch initial fleet data:', err);
@@ -112,10 +128,8 @@ export function useSocket() {
         if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
           t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
         }
-        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
-        if (t > currentRef) {
-          setServerClockOffset(t - Date.now() + 1000);
-        }
+        // WebSocket event is real-time; calibrate clock offset directly
+        setServerClockOffset(t - Date.now() + 1000);
       }
     };
 
@@ -128,10 +142,8 @@ export function useSocket() {
         if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
           t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
         }
-        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
-        if (t > currentRef) {
-          setServerClockOffset(t - Date.now() + 1000);
-        }
+        // WebSocket event is real-time; calibrate clock offset directly
+        setServerClockOffset(t - Date.now() + 1000);
       }
     };
 
@@ -165,10 +177,8 @@ export function useSocket() {
         if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
           t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
         }
-        const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
-        if (t > currentRef) {
-          setServerClockOffset(t - Date.now() + 1000);
-        }
+        // WebSocket event is real-time; calibrate clock offset directly
+        setServerClockOffset(t - Date.now() + 1000);
       }
     };
 
