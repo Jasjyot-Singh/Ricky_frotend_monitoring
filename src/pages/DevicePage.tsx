@@ -191,29 +191,27 @@ const DevicePage: React.FC = () => {
   };
 
   // Get unified variables from local store (ws-driven) or full REST details (database-driven)
-  const speed = deviceDetail?.liveStatus.speed ?? device.speed;
-  const batteryPct = deviceDetail?.liveStatus.batteryPercentage ?? device.batteryPercentage;
-  const batteryVolts = deviceDetail?.liveStatus.batteryVoltage ?? device.batteryVoltage;
-  const charging = deviceDetail?.liveStatus.charging ?? device.charging;
-  const gpsFix = deviceDetail?.liveStatus.gpsFix ?? device.gpsFix;
-  const internetConnected = deviceDetail?.liveStatus.internetConnected ?? device.internetConnected;
+  const speed = device?.speed ?? deviceDetail?.liveStatus.speed;
+  const batteryPct = device?.batteryPercentage ?? deviceDetail?.liveStatus.batteryPercentage;
+  const batteryVolts = device?.batteryVoltage ?? deviceDetail?.liveStatus.batteryVoltage;
+  const charging = device?.charging ?? deviceDetail?.liveStatus.charging;
+  const gpsFix = device?.gpsFix ?? deviceDetail?.liveStatus.gpsFix;
+  const internetConnected = device?.internetConnected ?? deviceDetail?.liveStatus.internetConnected;
 
   const sys = {
-    cpu: deviceDetail?.liveStatus.cpuUsage ?? device.system?.cpu ?? 0,
-    ram: deviceDetail?.liveStatus.ramUsage ?? device.system?.ram ?? 0,
-    disk: deviceDetail?.liveStatus.diskUsage ?? device.system?.disk ?? 0,
-    temp: deviceDetail?.liveStatus.cpuTemperature ?? device.system?.temp ?? 0,
+    cpu: device?.system?.cpu ?? deviceDetail?.liveStatus.cpuUsage ?? 0,
+    ram: device?.system?.ram ?? deviceDetail?.liveStatus.ramUsage ?? 0,
+    disk: device?.system?.disk ?? deviceDetail?.liveStatus.diskUsage ?? 0,
+    temp: device?.system?.temp ?? deviceDetail?.liveStatus.cpuTemperature ?? 0,
   };
 
-
-
   const imu = {
-    accelX: deviceDetail?.liveStatus.imuAccelX ?? device.imu?.accelX ?? null,
-    accelY: deviceDetail?.liveStatus.imuAccelY ?? device.imu?.accelY ?? null,
-    accelZ: deviceDetail?.liveStatus.imuAccelZ ?? device.imu?.accelZ ?? null,
-    gyroX: deviceDetail?.liveStatus.imuGyroX ?? device.imu?.gyroX ?? null,
-    gyroY: deviceDetail?.liveStatus.imuGyroY ?? device.imu?.gyroY ?? null,
-    gyroZ: deviceDetail?.liveStatus.imuGyroZ ?? device.imu?.gyroZ ?? null,
+    accelX: device?.imu?.accelX ?? deviceDetail?.liveStatus.imuAccelX ?? null,
+    accelY: device?.imu?.accelY ?? deviceDetail?.liveStatus.imuAccelY ?? null,
+    accelZ: device?.imu?.accelZ ?? deviceDetail?.liveStatus.imuAccelZ ?? null,
+    gyroX: device?.imu?.gyroX ?? deviceDetail?.liveStatus.imuGyroX ?? null,
+    gyroY: device?.imu?.gyroY ?? deviceDetail?.liveStatus.imuGyroY ?? null,
+    gyroZ: device?.imu?.gyroZ ?? deviceDetail?.liveStatus.imuGyroZ ?? null,
   };
 
   return (

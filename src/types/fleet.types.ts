@@ -240,12 +240,8 @@ export function getMarkerState(
     }
     const adjustedNow = Date.now() + serverClockOffset;
     const timeSinceLastTelemetry = adjustedNow - lastSeenTime;
-    const isRecent = timeSinceLastTelemetry <= 30000;
     const isRecent5Min = timeSinceLastTelemetry <= 300000;
-    const isZeroCoords = (device.latitude === 0 || device.latitude === null) && 
-                         (device.longitude === 0 || device.longitude === null);
-                         
-    if (!isRecent5Min || (isZeroCoords && !isRecent)) {
+    if (!isRecent5Min) {
       return 'offline';
     }
   } else {

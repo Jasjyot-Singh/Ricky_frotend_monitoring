@@ -287,7 +287,7 @@ const FleetTable: React.FC = () => {
                       <span>{formatTime(device.lastSeen)}</span>
                       {offline && (
                         <span className="text-[10px] text-danger-400 mt-0.5 font-semibold font-sans">
-                          {"⚠️ Offline (>30s)"}
+                          {"⚠️ Offline (>5m)"}
                         </span>
                       )}
                     </div>

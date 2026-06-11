@@ -234,31 +234,29 @@ export function computeActiveStatus(device: DeviceStatus, serverClockOffset: num
   }
   
   const timeSinceLastTelemetry = lastSeenTime > 0 ? (adjustedNow - lastSeenTime) : Infinity;
+  // 5 minutes telemetry activity limit (300,000 ms)
+  const isRecent = timeSinceLastTelemetry <= 300000;
   
-  // 30 seconds telemetry activity limit
-  const isRecent = timeSinceLastTelemetry <= 30000;
-  
-  // 1. Internet active: inactive if no telemetry in 30 seconds
+  // 1. Internet active: inactive if no telemetry in 5 minutes
   const internetActive = device.internetConnected && isRecent;
   
-  // 2. GPS active: inactive if no telemetry in 30 seconds OR coordinates are (0,0)
+  // 2. GPS active: inactive if no telemetry in 5 minutes OR coordinates are (0,0)
   const isZeroCoords = (device.latitude === 0 || device.latitude === null) && 
                        (device.longitude === 0 || device.longitude === null);
   const gpsActive = device.gpsFix && isRecent && !isZeroCoords;
   
-  // 3. Charging active: inactive if no telemetry in 30 seconds OR battery stagnant at <100% for 30s
+  // 3. Charging active: inactive if no telemetry in 5 minutes OR battery stagnant at <100% for 5 minutes
   let chargingActive = device.charging && isRecent;
   if (chargingActive && device.batteryPercentage !== null && device.batteryPercentage < 100) {
     const lastInc = device.lastBatteryIncreaseTime ?? lastSeenTime;
     const timeSinceIncrease = adjustedNow - lastInc;
-    if (timeSinceIncrease > 30000) {
+    if (timeSinceIncrease > 300000) { // 5 minutes
       chargingActive = false;
     }
   }
 
-  // 4. Online active: offline if no telemetry in 5 minutes (300,000 ms), OR if coordinates are (0,0) and no data for 30s
-  const isRecent5Min = timeSinceLastTelemetry <= 300000;
-  const onlineActive = device.online && isRecent5Min && !(isZeroCoords && !isRecent);
+  // 4. Online active: offline if no telemetry in 5 minutes (300,000 ms)
+  const onlineActive = device.online && isRecent;
 
   return {
     ...device,
@@ -335,11 +333,8 @@ export const useFleetStats = () =>
           }
         }
         const timeSince = lastSeenTime > 0 ? (adjustedNow - lastSeenTime) : Infinity;
-        const isRecent = timeSince <= 30000;
         const isRecent5Min = timeSince <= 300000;
-        const isZeroCoords = (d.latitude === 0 || d.latitude === null) &&
-                             (d.longitude === 0 || d.longitude === null);
-        const isOnline = d.online && isRecent5Min && !(isZeroCoords && !isRecent);
+        const isOnline = d.online && isRecent5Min;
         if (!isOnline) {
           offline++;
         } else {
