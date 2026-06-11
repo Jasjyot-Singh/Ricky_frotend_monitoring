@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { fleetSocket } from '../lib/socket';
 import { useFleetStore } from '../store/useFleetStore';
 import { api } from '../lib/api';
@@ -11,7 +11,7 @@ import type { DeviceStatus, Alert } from '../types/fleet.types';
  * Also fetches initial fleet snapshot via REST (no Socket.IO fleet:subscribe).
  * Should be called once at the app root level.
  */
-export function useSocket() {
+export function useSocket(token: string | null) {
   const setFleetSnapshot = useFleetStore((s) => s.setFleetSnapshot);
   const updateDevice = useFleetStore((s) => s.updateDevice);
   const markDeviceOffline = useFleetStore((s) => s.markDeviceOffline);
@@ -22,8 +22,10 @@ export function useSocket() {
   const setServerClockOffset = useFleetStore((s) => s.setServerClockOffset);
   const setGlobalManuallyResolvedIds = useFleetStore((s) => s.setGlobalManuallyResolvedIds);
 
+  const lastCalibratedTimeRef = useRef<number>(0);
+
   useEffect(() => {
-    if (!isAuthenticated()) return;
+    if (!token) return;
 
     // ── Initial REST fetch for fleet data ──────────────────
     const fetchInitialData = async () => {
@@ -62,23 +64,33 @@ export function useSocket() {
         // Dynamically compute the server-client clock offset based on the latest timestamps
         let maxOnlineTime = 0;
         const now = Date.now();
+        const currentOffset = useFleetStore.getState().serverClockOffset;
+        const currentServerTime = now + currentOffset;
+
         for (const d of devices) {
           if (d.online && d.lastSeen) {
             let lastSeenTime = new Date(d.lastSeen).getTime();
             if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
               lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
             }
-            // Only calibrate if the device sent telemetry within the last 2 minutes.
-            // This prevents a stale 'online: true' DB row from skewing the clock back.
-            if (Math.abs(now - lastSeenTime) < 2 * 60 * 1000) {
-              if (lastSeenTime > maxOnlineTime) maxOnlineTime = lastSeenTime;
+            // If we haven't calibrated yet (offset === 0), allow initial calibration within 30 minutes.
+            // If we already have a calibrated offset, only calibrate if the telemetry is extremely fresh (within 20 seconds).
+            const isFresh = currentOffset === 0
+              ? Math.abs(now - lastSeenTime) < 30 * 60 * 1000
+              : Math.abs(currentServerTime - lastSeenTime) < 20 * 1000;
+
+            if (isFresh && lastSeenTime > maxOnlineTime) {
+              maxOnlineTime = lastSeenTime;
             }
           }
         }
 
         if (maxOnlineTime > 0) {
           // If a device is currently online, synchronize client-server offset perfectly based on its heartbeat
-          setServerClockOffset(maxOnlineTime - Date.now() + 1000);
+          if (maxOnlineTime > lastCalibratedTimeRef.current) {
+            setServerClockOffset(maxOnlineTime - Date.now() + 1000);
+            lastCalibratedTimeRef.current = maxOnlineTime;
+          }
         } else {
           // Fallback: if all devices are offline, calibrate only if client clock is behind (to avoid shifting to past dates)
           let maxTime = 0;
@@ -88,8 +100,11 @@ export function useSocket() {
               if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
                 lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
               }
-              // Only consider fallback if it is recent (e.g. within the last 5 minutes)
-              if (Math.abs(now - lastSeenTime) < 5 * 60 * 1000 && lastSeenTime > maxTime) {
+              const isFresh = currentOffset === 0
+                ? Math.abs(now - lastSeenTime) < 30 * 60 * 1000
+                : Math.abs(currentServerTime - lastSeenTime) < 20 * 1000;
+
+              if (isFresh && lastSeenTime > maxTime) {
                 maxTime = lastSeenTime;
               }
             }
@@ -100,14 +115,21 @@ export function useSocket() {
               if (typeof a.createdAt === 'string' && !a.createdAt.endsWith('Z') && !a.createdAt.includes('+')) {
                 t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
               }
-              if (Math.abs(now - t) < 5 * 60 * 1000 && t > maxTime) {
+              const isFresh = currentOffset === 0
+                ? Math.abs(now - t) < 30 * 60 * 1000
+                : Math.abs(currentServerTime - t) < 20 * 1000;
+
+              if (isFresh && t > maxTime) {
                 maxTime = t;
               }
             }
           }
           const currentRef = Date.now() + useFleetStore.getState().serverClockOffset;
           if (maxTime > currentRef) {
-            setServerClockOffset(maxTime - Date.now() + 1000);
+            if (maxTime > lastCalibratedTimeRef.current) {
+              setServerClockOffset(maxTime - Date.now() + 1000);
+              lastCalibratedTimeRef.current = maxTime;
+            }
           }
         }
       } catch (err) {
@@ -137,7 +159,16 @@ export function useSocket() {
           t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
         }
         // WebSocket event is real-time; calibrate clock offset directly
-        setServerClockOffset(t - Date.now() + 1000);
+        const currentOffset = useFleetStore.getState().serverClockOffset;
+        const currentServerTime = Date.now() + currentOffset;
+        const isFresh = currentOffset === 0
+          ? Math.abs(Date.now() - t) < 30 * 60 * 1000
+          : Math.abs(currentServerTime - t) < 20 * 1000;
+
+        if (isFresh && t > lastCalibratedTimeRef.current) {
+          setServerClockOffset(t - Date.now() + 1000);
+          lastCalibratedTimeRef.current = t;
+        }
       }
     };
 
@@ -151,7 +182,16 @@ export function useSocket() {
           t = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
         }
         // WebSocket event is real-time; calibrate clock offset directly
-        setServerClockOffset(t - Date.now() + 1000);
+        const currentOffset = useFleetStore.getState().serverClockOffset;
+        const currentServerTime = Date.now() + currentOffset;
+        const isFresh = currentOffset === 0
+          ? Math.abs(Date.now() - t) < 30 * 60 * 1000
+          : Math.abs(currentServerTime - t) < 20 * 1000;
+
+        if (isFresh && t > lastCalibratedTimeRef.current) {
+          setServerClockOffset(t - Date.now() + 1000);
+          lastCalibratedTimeRef.current = t;
+        }
       }
     };
 
@@ -186,7 +226,16 @@ export function useSocket() {
           t = new Date(a.createdAt.replace(' ', 'T') + 'Z').getTime();
         }
         // WebSocket event is real-time; calibrate clock offset directly
-        setServerClockOffset(t - Date.now() + 1000);
+        const currentOffset = useFleetStore.getState().serverClockOffset;
+        const currentServerTime = Date.now() + currentOffset;
+        const isFresh = currentOffset === 0
+          ? Math.abs(Date.now() - t) < 30 * 60 * 1000
+          : Math.abs(currentServerTime - t) < 20 * 1000;
+
+        if (isFresh && t > lastCalibratedTimeRef.current) {
+          setServerClockOffset(t - Date.now() + 1000);
+          lastCalibratedTimeRef.current = t;
+        }
       }
     };
 
@@ -225,5 +274,5 @@ export function useSocket() {
       fleetSocket.off('alert-created', handleAlertCreated);
       unsubConnection();
     };
-  }, [setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats, setAlertsSnapshot]);
+  }, [token, setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats, setAlertsSnapshot, setServerClockOffset, setGlobalManuallyResolvedIds]);
 }

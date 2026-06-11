@@ -16,8 +16,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
+  const token = localStorage.getItem('ricky_access_token');
   // Initialize WebSocket connection at the app root (only when authed)
-  useSocket();
+  useSocket(token);
 
   return (
     <Routes>
