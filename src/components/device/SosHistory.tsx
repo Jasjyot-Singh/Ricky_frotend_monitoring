@@ -10,6 +10,7 @@ interface SosHistoryProps {
 const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   const [events, setEvents] = useState<SosEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const alertsFromStore = useFleetStore((s) => s.alerts);
   const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
 
   useEffect(() => {
@@ -20,22 +21,25 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
           api.getDeviceAlerts(deviceId),
         ]);
 
+        const sosAlerts = alertsData.filter((a) => a.type === 'SOS');
+        const matchedAlertIds = new Set<number>();
+
         const enrichedEvents = sosData.map((event) => {
           // Find matching SOS alert by timestamp (within 5-minute window)
-          const matchedAlert = alertsData.find((a) => {
-            if (a.type !== 'SOS') return false;
+          const matchedAlert = sosAlerts.find((a) => {
             const eventTime = new Date(event.timestamp).getTime();
             const alertTime = new Date(a.createdAt).getTime();
             return Math.abs(eventTime - alertTime) < 5 * 60 * 1000;
           });
 
           if (matchedAlert) {
-            // Event is resolved if matched alert is resolved in DB or manually resolved in this session
+            matchedAlertIds.add(matchedAlert.id);
             const isResolved = matchedAlert.resolved || globalManuallyResolvedIds.has(matchedAlert.id);
             return {
               ...event,
               resolved: isResolved,
               resolvedAt: isResolved ? (event.resolvedAt || matchedAlert.resolvedAt || event.timestamp) : null,
+              alertId: matchedAlert.id,
             };
           }
 
@@ -47,7 +51,26 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
           };
         });
 
-        setEvents(enrichedEvents);
+        // Add synthetic events for any unmatched SOS alerts
+        const unmatchedEvents = sosAlerts
+          .filter((a) => !matchedAlertIds.has(a.id))
+          .map((a) => {
+            const isResolved = a.resolved || globalManuallyResolvedIds.has(a.id);
+            return {
+              id: -a.id,
+              deviceId: a.deviceId,
+              source: 'Panic Warning',
+              resolved: isResolved,
+              timestamp: a.createdAt,
+              resolvedAt: isResolved ? (a.resolvedAt || a.createdAt) : null,
+              alertId: a.id,
+            };
+          });
+
+        const allMergedEvents = [...enrichedEvents, ...unmatchedEvents];
+        allMergedEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        setEvents(allMergedEvents);
       } catch (err) {
         console.error('Failed to fetch SOS events:', err);
       } finally {
@@ -55,7 +78,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
       }
     };
     fetchEvents();
-  }, [deviceId, globalManuallyResolvedIds]);
+  }, [deviceId, globalManuallyResolvedIds, alertsFromStore]);
 
   const formatDate = (iso: string) => {
     return new Date(iso).toLocaleString('en-IN', {

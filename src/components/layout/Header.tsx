@@ -27,18 +27,6 @@ const Header: React.FC = () => {
           <span className="status-dot status-dot--online" />
           <span className="text-sm font-semibold text-fleet-400">{stats.online}</span>
         </div>
-        {stats.sosActive > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-danger-500/10 border border-danger-500/20 sos-pulse">
-            <span className="status-dot status-dot--danger" />
-            <span className="text-sm font-semibold text-danger-400">{stats.sosActive} SOS</span>
-          </div>
-        )}
-        {stats.lowBattery > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning-500/10 border border-warning-500/20">
-            <span className="text-xs">🔋</span>
-            <span className="text-sm font-semibold text-warning-400">{stats.lowBattery} Low</span>
-          </div>
-        )}
       </div>
 
       {/* Right: Connection status + time + logout */}

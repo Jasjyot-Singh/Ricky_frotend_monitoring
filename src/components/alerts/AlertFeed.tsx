@@ -9,6 +9,8 @@ interface AlertFeedProps {
 
 const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
   const alerts = useLatestAlerts(maxAlerts);
+  const allAlerts = useFleetStore((s) => s.alerts);
+  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
 
   const handleResolve = useCallback(async (alertId: number) => {
@@ -33,10 +35,13 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
     }
   }, [alerts, resolveAlertInStore]);
 
-  // Count unresolved alerts
-  const unresolvedCount = alerts.length;
+  // Count all unresolved alerts in store
+  const unresolvedCount = allAlerts.filter(
+    (a) => !a.resolved && !globalManuallyResolvedIds.has(a.id)
+  ).length;
 
   return (
+
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

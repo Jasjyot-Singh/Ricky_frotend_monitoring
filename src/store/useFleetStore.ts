@@ -215,6 +215,18 @@ export const useFleetStats = () =>
       let sosActive = 0;
       let lowBattery = 0;
 
+      // Extract set of device IDs with active (unresolved) SOS or LOW_BATTERY alerts
+      const activeSOSDevices = new Set(
+        s.alerts
+          .filter((a) => a.type === 'SOS' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
+          .map((a) => a.deviceId)
+      );
+      const activeBatteryDevices = new Set(
+        s.alerts
+          .filter((a) => a.type === 'LOW_BATTERY' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
+          .map((a) => a.deviceId)
+      );
+
       for (const d of devices) {
         let isDeviceOffline = !d.online;
         if (d.lastSeen) {
@@ -235,10 +247,10 @@ export const useFleetStats = () =>
           online++;
         }
 
-        if (d.sosActive) {
+        if (activeSOSDevices.has(d.deviceId)) {
           sosActive++;
         }
-        if (d.batteryPercentage !== null && d.batteryPercentage < 20) {
+        if (activeBatteryDevices.has(d.deviceId)) {
           lowBattery++;
         }
       }
@@ -260,11 +272,11 @@ export const useLatestAlerts = (count = 20) => {
 
   return useMemo(() => {
     const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-    // Override alert resolved state to only count as resolved if manually clicked by operator
+    // Enrich with local manual resolutions but respect backend/WS resolved flag
     const enriched = alerts.map((a) => ({
       ...a,
-      resolved: globalManuallyResolvedIds.has(a.id),
-      resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+      resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
+      resolvedAt: (a.resolved || globalManuallyResolvedIds.has(a.id)) ? (a.resolvedAt || a.createdAt) : null,
     }));
     const unresolved = enriched.filter((a) => !a.resolved);
     const sorted = unresolved.sort((a, b) => {
@@ -278,3 +290,4 @@ export const useLatestAlerts = (count = 20) => {
     return sorted.slice(0, count);
   }, [alerts, globalManuallyResolvedIds, count]);
 };
+

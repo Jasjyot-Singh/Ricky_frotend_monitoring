@@ -256,12 +256,7 @@ const AlertsPage: React.FC = () => {
     return groups;
   }, [processedAlerts]);
 
-  // Count active vs total
-  const stats = useMemo(() => {
-    const active = allAlerts.filter((a) => !a.resolved).length;
-    const resolved = allAlerts.filter((a) => a.resolved).length;
-    return { active, resolved, total: allAlerts.length };
-  }, [allAlerts]);
+
 
   // Format relative timestamp
   const getRelativeTime = (dateStr: string) => {
@@ -289,22 +284,6 @@ const AlertsPage: React.FC = () => {
           <p className="text-sm text-surface-400 mt-1">
             Analyze historical failures, safety incidents, and resolve diagnostic notifications.
           </p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="flex items-center gap-3">
-          <div className="bg-surface-800/40 border border-surface-700/30 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <p className="text-xs text-surface-500 font-medium uppercase">Active</p>
-            <p className="text-lg font-bold text-danger-400 mt-0.5">{stats.active}</p>
-          </div>
-          <div className="bg-surface-800/40 border border-surface-700/30 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <p className="text-xs text-surface-500 font-medium uppercase">Resolved</p>
-            <p className="text-lg font-bold text-fleet-400 mt-0.5">{stats.resolved}</p>
-          </div>
-          <div className="bg-surface-800/40 border border-surface-700/30 rounded-xl px-4 py-2 text-center min-w-[90px]">
-            <p className="text-xs text-surface-500 font-medium uppercase">Total</p>
-            <p className="text-lg font-bold text-surface-300 mt-0.5">{stats.total}</p>
-          </div>
         </div>
       </div>
 
