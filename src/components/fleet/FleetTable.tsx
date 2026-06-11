@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDeviceList, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../../store/useFleetStore';
+import { useDeviceList, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../../store/useFleetStore';
 import { getMarkerState } from '../../types/fleet.types';
 import StatusBadge from './StatusBadge';
 
@@ -175,7 +175,8 @@ const FleetTable: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-800/50">
-            {filteredDevices.map((device) => {
+            {filteredDevices.map((rawDevice) => {
+              const device = computeActiveStatus(rawDevice, serverClockOffset);
               const state = getMarkerState(device, serverClockOffset, sosSet, warningSet);
               const offline = isOffline(device);
               const hasActiveSos = sosSet.has(device.deviceId);

@@ -281,26 +281,23 @@ export function computeActiveStatus(device: DeviceStatus, serverClockOffset: num
 export const useDeviceList = () =>
   useFleetStore(
     useShallow((s) =>
-      Object.values(s.devices)
-        .map((d) => computeActiveStatus(d, s.serverClockOffset))
-        .sort((a, b) => a.deviceId.localeCompare(b.deviceId)),
+      Object.values(s.devices).sort((a, b) =>
+        a.deviceId.localeCompare(b.deviceId),
+      ),
     ),
   );
 
 /** Returns a single device by ID */
 export const useDevice = (deviceId: string) =>
-  useFleetStore((s) => {
-    const d = s.devices[deviceId];
-    return d ? computeActiveStatus(d, s.serverClockOffset) : null;
-  });
+  useFleetStore((s) => s.devices[deviceId] ?? null);
 
 /** Returns only devices with coordinates (for map) */
 export const useMapDevices = () =>
   useFleetStore(
     useShallow((s) =>
-      Object.values(s.devices)
-        .map((d) => computeActiveStatus(d, s.serverClockOffset))
-        .filter((d) => d.latitude !== null && d.longitude !== null),
+      Object.values(s.devices).filter(
+        (d) => d.latitude !== null && d.longitude !== null,
+      ),
     ),
   );
 
@@ -327,9 +324,23 @@ export const useFleetStats = () =>
           .map((a) => a.deviceId)
       );
 
+      const adjustedNow = Date.now() + s.serverClockOffset;
       for (const d of devices) {
-        const computed = computeActiveStatus(d, s.serverClockOffset);
-        if (!computed.online) {
+        // Determine offline using 5-minute threshold directly (no Date.now in selector above)
+        let lastSeenTime = d.lastTelemetryTime ?? 0;
+        if (!lastSeenTime && d.lastSeen) {
+          lastSeenTime = new Date(d.lastSeen).getTime();
+          if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
+            lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
+          }
+        }
+        const timeSince = lastSeenTime > 0 ? (adjustedNow - lastSeenTime) : Infinity;
+        const isRecent = timeSince <= 30000;
+        const isRecent5Min = timeSince <= 300000;
+        const isZeroCoords = (d.latitude === 0 || d.latitude === null) &&
+                             (d.longitude === 0 || d.longitude === null);
+        const isOnline = d.online && isRecent5Min && !(isZeroCoords && !isRecent);
+        if (!isOnline) {
           offline++;
         } else {
           online++;

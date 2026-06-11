@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useMapDevices } from '../../store/useFleetStore';
+import { useMapDevices, useFleetStore, computeActiveStatus } from '../../store/useFleetStore';
 import RickshawMarker from './RickshawMarker';
 
 // Fix Leaflet default icon paths
@@ -44,7 +44,9 @@ interface FleetMapProps {
 }
 
 const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) => {
-  const devices = useMapDevices();
+  const rawDevices = useMapDevices();
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
+  const devices = rawDevices.map((d) => computeActiveStatus(d, serverClockOffset));
 
   // Default center: Aurangabad, Maharashtra
   const defaultCenter: [number, number] = [19.8762, 75.3433];

@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../store/useFleetStore';
+import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
 import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
@@ -47,7 +47,9 @@ const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] 
 
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
-  const device = useDevice(deviceId || '');
+  const rawDevice = useDevice(deviceId || '');
+  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
+  const device = rawDevice ? computeActiveStatus(rawDevice, serverClockOffset) : null;
   const sosDeviceIds = useActiveSosDeviceIds();
   const warningDeviceIds = useActiveWarningDeviceIds();
 
@@ -64,8 +66,6 @@ const DevicePage: React.FC = () => {
   const [sendingCommand, setSendingCommand] = useState(false);
   const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
-
-  const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
 
   useEffect(() => {
     const lastSeenTime = deviceDetail?.liveStatus.lastSeen ?? device?.lastSeen;
