@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
-import type { LocationPoint, DeviceDetailResponse } from '../types/fleet.types';
+import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
 import StatusBadge from '../components/fleet/StatusBadge';
 import SystemHealthCharts from '../components/device/SystemHealthCharts';
@@ -37,6 +37,13 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
   });
 }
 
+const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
+  { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
+  { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
+  { value: 'RESTART_PI', label: 'Restart Pi', icon: '🔄' },
+  { value: 'FORCE_GPS_PING', label: 'Force GPS Ping', icon: '🛰' },
+];
+
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const rawDevice = useDevice(deviceId || '');
@@ -52,8 +59,11 @@ const DevicePage: React.FC = () => {
     };
   }, [sosDeviceIds, warningDeviceIds]);
   const [deviceDetail, setDeviceDetail] = useState<DeviceDetailResponse | null>(null);
+  const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [sendingCommand, setSendingCommand] = useState(false);
+  const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
 
   useEffect(() => {
@@ -93,22 +103,44 @@ const DevicePage: React.FC = () => {
     fetchHistory();
   }, [deviceId]);
 
-  // Poll for Device Details every 5 seconds
+  // Poll for Device Details and Command History every 5 seconds
   useEffect(() => {
     if (!deviceId) return;
 
     const fetchLiveData = async () => {
       try {
-        const detailData = await api.getDevice(deviceId);
+        const [detailData, commandsData] = await Promise.all([
+          api.getDevice(deviceId),
+          api.getCommandHistory(deviceId),
+        ]);
         setDeviceDetail(detailData);
+        setCommandHistory(commandsData);
       } catch (err) {
-        console.error('Failed to fetch live device details:', err);
+        console.error('Failed to fetch live device details or command history:', err);
       }
     };
 
     fetchLiveData(); // initial call
     const interval = setInterval(fetchLiveData, 5000);
     return () => clearInterval(interval);
+  }, [deviceId]);
+
+  const handleSendCommand = useCallback(async (command: CommandType) => {
+    if (!deviceId) return;
+    setSendingCommand(true);
+    setCommandStatus(null);
+    try {
+      const res = await api.sendCommand(deviceId, command);
+      setCommandStatus(`✅ ${res.message} (ID: ${res.commandId})`);
+      // Immediately refresh command history
+      const freshCommands = await api.getCommandHistory(deviceId);
+      setCommandHistory(freshCommands);
+    } catch (err) {
+      setCommandStatus(`❌ ${err instanceof Error ? err.message : 'Failed to send command'}`);
+    } finally {
+      setSendingCommand(false);
+      setTimeout(() => setCommandStatus(null), 5000);
+    }
   }, [deviceId]);
 
   if (!device) {
@@ -450,7 +482,121 @@ const DevicePage: React.FC = () => {
 
       {/* SOS Events Section (Removed from UI) */}
 
-      {/* Remote Commands & History (Removed from UI) */}
+      {/* Remote Commands & History */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider">
+          Remote Management & Command Logs
+        </h3>
+        <div className="glass-card p-5">
+          <p className="text-xs text-surface-500 mb-4">
+            Send remote commands to <span className="text-fleet-400 font-mono">{device.deviceId}</span>
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {AVAILABLE_COMMANDS.map((cmd) => (
+              <button
+                key={cmd.value}
+                onClick={() => handleSendCommand(cmd.value)}
+                disabled={sendingCommand}
+                className="btn btn--ghost text-xs py-2.5 flex flex-col items-center justify-center gap-1 hover:bg-surface-800 transition-all border border-surface-700/30 rounded-xl"
+              >
+                <span className="text-lg">{cmd.icon}</span>
+                <span>{cmd.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Command Input Form */}
+          <div className="mt-4 p-4 bg-surface-800/40 rounded-xl border border-surface-700/30">
+            <h4 className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Send Custom Instruction
+            </h4>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const customCmd = formData.get('customCommand') as string;
+                if (customCmd.trim()) {
+                  handleSendCommand(customCmd.trim().toUpperCase());
+                  e.currentTarget.reset();
+                }
+              }}
+              className="flex gap-2 max-w-lg"
+            >
+              <input
+                type="text"
+                name="customCommand"
+                placeholder="Enter custom command (e.g. RESET_SOS, START_SOS, REBOOT_DEVICE)"
+                className="flex-1 px-3 py-1.5 text-xs bg-surface-900 border border-surface-700 rounded-lg text-white placeholder-surface-500 focus:outline-none focus:border-fleet-400 focus:ring-1 focus:ring-fleet-400/25"
+                disabled={sendingCommand}
+              />
+              <button
+                type="submit"
+                disabled={sendingCommand}
+                className="btn btn--primary text-xs py-1.5 px-4 bg-fleet-600 hover:bg-fleet-500 text-white rounded-lg transition-all"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+
+          {commandStatus && (
+            <p className="text-sm text-surface-300 mt-3 animate-fade-in font-mono">{commandStatus}</p>
+          )}
+
+          {/* Command History Table */}
+          <div className="mt-6 pt-6 border-t border-surface-800">
+            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">
+              Command Execution History
+            </h4>
+            {commandHistory.length === 0 ? (
+              <p className="text-xs text-surface-500 italic">No remote commands sent to this device yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-surface-300">
+                  <thead>
+                    <tr className="border-b border-surface-800 text-surface-500 uppercase tracking-wider text-[10px]">
+                      <th className="py-2">Command</th>
+                      <th className="py-2">Status</th>
+                      <th className="py-2">Sent At</th>
+                      <th className="py-2">Executed At</th>
+                      <th className="py-2">Response</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-800/40">
+                    {commandHistory.map((cmd) => (
+                      <tr key={cmd.id} className="hover:bg-surface-800/20">
+                        <td className="py-2.5 font-mono text-[11px] text-white">{cmd.command}</td>
+                        <td className="py-2.5">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
+                            cmd.status === 'executed'
+                              ? 'bg-fleet-500/15 text-fleet-400'
+                              : cmd.status === 'failed'
+                                ? 'bg-danger-500/15 text-danger-400'
+                                : 'bg-warning-500/15 text-warning-400'
+                          }`}>
+                            {cmd.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-surface-400 font-mono text-[11px]">
+                          {new Date(cmd.createdAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 text-surface-400 font-mono text-[11px]">
+                          {cmd.executedAt 
+                            ? new Date(cmd.executedAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                            : '—'}
+                        </td>
+                        <td className="py-2.5 max-w-[200px] truncate text-[11px] text-surface-400" title={cmd.response || ''}>
+                          {cmd.response || <span className="text-surface-600 italic">Waiting for Pi...</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <RemoteAccessPanel deviceId={device.deviceId} />
     </div>

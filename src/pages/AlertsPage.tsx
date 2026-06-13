@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useFleetStore, useDeviceList } from '../store/useFleetStore';
@@ -31,6 +31,7 @@ const AlertsPage: React.FC = () => {
   
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const isInitialLoadRef = useRef(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'RESOLVED'>('ALL');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('ALL');
@@ -61,10 +62,14 @@ const AlertsPage: React.FC = () => {
 
   // Fetch all alerts on mount
   useEffect(() => {
+    let active = true;
     const fetchAlerts = async () => {
       try {
-        setLoading(true);
+        if (isInitialLoadRef.current) {
+          setLoading(true);
+        }
         const data = await api.getAllAlerts();
+        if (!active) return;
         // Sync resolved state from database, or check if operator manually resolved it in this session
         const enriched = data.map((a) => ({
           ...a,
@@ -77,12 +82,20 @@ const AlertsPage: React.FC = () => {
         setError(null);
       } catch (err: any) {
         console.error('Failed to fetch all alerts history:', err);
-        setError(err.message || 'Failed to load alerts.');
+        if (isInitialLoadRef.current) {
+          setError(err.message || 'Failed to load alerts.');
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+          isInitialLoadRef.current = false;
+        }
       }
     };
     fetchAlerts();
+    return () => {
+      active = false;
+    };
   }, [alertsFromStore, globalManuallyResolvedIds]); // Refresh if store alerts or global resolutions change
 
   // Handle resolving an alert (only called by explicit operator button click)
