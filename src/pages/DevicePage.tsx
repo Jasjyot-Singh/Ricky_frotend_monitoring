@@ -165,12 +165,14 @@ const DevicePage: React.FC = () => {
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
   const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
 
+  const isZeroCoord = latitude === 0 && longitude === 0;
+
   const trailPositions: [number, number][] = locationHistory
-    .filter((p) => p.latitude && p.longitude)
+    .filter((p) => p.latitude !== null && p.longitude !== null && !(p.latitude === 0 && p.longitude === 0))
     .map((p) => [p.latitude, p.longitude]);
 
   const mapCenter: [number, number] =
-    latitude !== null && longitude !== null
+    latitude !== null && longitude !== null && !isZeroCoord
       ? [latitude, longitude]
       : [19.8762, 75.3433];
 
@@ -315,7 +317,7 @@ const DevicePage: React.FC = () => {
             </span>
           )}
         </h3>
-        <div className="rounded-2xl overflow-hidden h-[400px]">
+        <div className="rounded-2xl overflow-hidden h-[400px] relative">
           <MapContainer
             center={mapCenter}
             zoom={15}
@@ -340,7 +342,7 @@ const DevicePage: React.FC = () => {
             )}
 
             {/* Current position marker */}
-            {latitude !== null && longitude !== null && (
+            {latitude !== null && longitude !== null && !isZeroCoord && (
               <Marker
                 position={[latitude, longitude]}
                 icon={icon}
@@ -403,6 +405,14 @@ const DevicePage: React.FC = () => {
               </Marker>
             )}
           </MapContainer>
+
+          {isZeroCoord && (
+            <div className="absolute top-4 right-4 z-[1000] glass-card border border-danger-500/30 bg-danger-950/80 backdrop-blur-md px-3 py-2 animate-pulse pointer-events-none">
+              <span className="text-xs text-danger-400 font-semibold">
+                ⚠️ Auto {device.vehicleNumber || device.deviceId}: Lat, Long zero
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

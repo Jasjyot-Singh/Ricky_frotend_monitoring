@@ -20,7 +20,11 @@ L.Icon.Default.mergeOptions({
 
 /** Auto-fits the map bounds to show all markers */
 const MapBoundsUpdater: React.FC = () => {
-  const devices = useMapDevices();
+  const allDevices = useMapDevices();
+  const devices = useMemo(() => {
+    return allDevices.filter((d) => !(d.latitude === 0 && d.longitude === 0));
+  }, [allDevices]);
+
   const map = useMap();
 
   useMemo(() => {
@@ -46,7 +50,19 @@ interface FleetMapProps {
 const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) => {
   const rawDevices = useMapDevices();
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
-  const devices = rawDevices.map((d) => computeActiveStatus(d, serverClockOffset));
+  const devices = useMemo(() => {
+    return rawDevices.map((d) => computeActiveStatus(d, serverClockOffset));
+  }, [rawDevices, serverClockOffset]);
+
+  // Find any devices that have coordinates (0, 0)
+  const zeroDevices = useMemo(() => {
+    return devices.filter((d) => d.latitude === 0 && d.longitude === 0);
+  }, [devices]);
+
+  // Only render devices with valid coordinates (not 0, 0)
+  const validDevices = useMemo(() => {
+    return devices.filter((d) => !(d.latitude === 0 && d.longitude === 0));
+  }, [devices]);
 
   // Default center: Aurangabad, Maharashtra
   const defaultCenter: [number, number] = [19.8762, 75.3433];
@@ -65,7 +81,7 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {devices.map((device) => (
+        {validDevices.map((device) => (
           <RickshawMarker
             key={device.deviceId}
             device={device}
@@ -76,11 +92,20 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
         <MapBoundsUpdater />
       </MapContainer>
 
-      {/* Map overlay: device count */}
-      <div className="absolute top-4 right-4 z-[1000] glass-card px-3 py-2">
-        <span className="text-xs text-surface-400">
-          {devices.length} device{devices.length !== 1 ? 's' : ''} on map
-        </span>
+      {/* Map overlay: device count & zero coordinates warnings */}
+      <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2 pointer-events-none">
+        <div className="glass-card px-3 py-2 bg-surface-900/80 backdrop-blur-md">
+          <span className="text-xs text-surface-200">
+            {validDevices.length} device{validDevices.length !== 1 ? 's' : ''} on map
+          </span>
+        </div>
+        {zeroDevices.map((d) => (
+          <div key={d.deviceId} className="glass-card border border-danger-500/30 bg-danger-950/80 backdrop-blur-md px-3 py-2 flex items-center gap-2 animate-pulse">
+            <span className="text-xs text-danger-400 font-semibold">
+              ⚠️ Auto {d.vehicleNumber || d.deviceId}: Lat, Long zero
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
