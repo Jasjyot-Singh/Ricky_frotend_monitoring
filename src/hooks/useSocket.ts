@@ -19,7 +19,6 @@ export function useSocket(token: string | null) {
   const setFleetStats = useFleetStore((s) => s.setFleetStats);
   const setAlertsSnapshot = useFleetStore((s) => s.setAlertsSnapshot);
   const setServerClockOffset = useFleetStore((s) => s.setServerClockOffset);
-  const setGlobalManuallyResolvedIds = useFleetStore((s) => s.setGlobalManuallyResolvedIds);
 
   const lastCalibratedTimeRef = useRef<number>(0);
 
@@ -38,27 +37,6 @@ export function useSocket(token: string | null) {
         setFleetStats(stats);
         setAlertsSnapshot(alerts);
         setConnected(true);
-
-        // Fetch command history for all devices to sync manually resolved alerts across sessions
-        try {
-          const commandHistories = await Promise.all(
-            devices.map((d) => api.getCommandHistory(d.deviceId).catch(() => []))
-          );
-          const manualResolved = new Set<number>();
-          for (const history of commandHistories) {
-            for (const cmd of history) {
-              if (cmd.command.startsWith('RESOLVE_ALERT_')) {
-                const id = parseInt(cmd.command.replace('RESOLVE_ALERT_', ''), 10);
-                if (!isNaN(id)) {
-                  manualResolved.add(id);
-                }
-              }
-            }
-          }
-          setGlobalManuallyResolvedIds(manualResolved);
-        } catch (err) {
-          console.warn('Failed to sync manually resolved alerts from command history:', err);
-        }
 
         // Dynamically compute the server-client clock offset based on the latest timestamps
         let maxOnlineTime = 0;
@@ -273,5 +251,5 @@ export function useSocket(token: string | null) {
       fleetSocket.off('alert-created', handleAlertCreated);
       unsubConnection();
     };
-  }, [token, setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats, setAlertsSnapshot, setServerClockOffset, setGlobalManuallyResolvedIds]);
+  }, [token, setFleetSnapshot, updateDevice, markDeviceOffline, addAlert, setConnected, setFleetStats, setAlertsSnapshot, setServerClockOffset]);
 }

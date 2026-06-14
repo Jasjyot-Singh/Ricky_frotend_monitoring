@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
-import type { LocationPoint, DeviceDetailResponse } from '../types/fleet.types';
+import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
 import StatusBadge from '../components/fleet/StatusBadge';
 import SystemHealthCharts from '../components/device/SystemHealthCharts';
@@ -37,6 +37,49 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
   });
 }
 
+function createReplayMarkerIcon(): L.DivIcon {
+  return L.DivIcon ? L.divIcon({
+    className: 'custom-replay-marker',
+    html: `
+      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+        <div style="
+          position: absolute; width: 100%; height: 100%;
+          background: #3b82f6;
+          border-radius: 50%;
+          opacity: 0.3;
+          animation: pulse 1.5s ease-in-out infinite;
+        "></div>
+        <div style="
+          position: absolute; width: 14px; height: 14px;
+          background: #3b82f6;
+          border: 2px solid white;
+          border-radius: 50%;
+          box-shadow: 0 0 8px #3b82f6;
+        "></div>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  }) : {} as L.DivIcon;
+}
+
+const ReplayMapPanController: React.FC<{ position: [number, number] | null; isPlaying: boolean }> = ({ position, isPlaying }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (isPlaying && position) {
+      map.panTo(position);
+    }
+  }, [position, isPlaying, map]);
+  return null;
+};
+
+const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
+  { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
+  { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
+  { value: 'RESTART_PI', label: 'Restart Pi', icon: '🔄' },
+  { value: 'FORCE_GPS_PING', label: 'Force GPS Ping', icon: '🛰' },
+];
+
 const DevicePage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const rawDevice = useDevice(deviceId || '');
@@ -52,8 +95,29 @@ const DevicePage: React.FC = () => {
     };
   }, [sosDeviceIds, warningDeviceIds]);
   const [deviceDetail, setDeviceDetail] = useState<DeviceDetailResponse | null>(null);
+  const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [replaySpeed, setReplaySpeed] = useState(1); // 1x, 2x, 5x, 10x
+  const filteredHistory = useMemo(() => {
+    return locationHistory.filter((p) => {
+      if (!p) return false;
+      const lat = parseFloat(p.latitude as any);
+      const lng = parseFloat(p.longitude as any);
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    });
+  }, [locationHistory]);
+  const [sendingCommand, setSendingCommand] = useState(false);
+  const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
 
   useEffect(() => {
@@ -74,14 +138,17 @@ const DevicePage: React.FC = () => {
     const timerInterval = setInterval(updateTimer, 1000);
     return () => clearInterval(timerInterval);
   }, [deviceDetail?.liveStatus.lastSeen, device?.lastSeen, serverClockOffset]);
-  // Fetch location history once on mount
+
+  // Fetch location history when deviceId or selectedDate changes
   useEffect(() => {
     if (!deviceId) return;
     const fetchHistory = async () => {
+      setLoadingHistory(true);
+      setIsReplaying(false);
+      setReplayIndex(0);
       try {
-        const today = new Date();
-        const from = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
-        const to = today.toISOString();
+        const from = `${selectedDate}T00:00:00`;
+        const to = `${selectedDate}T23:59:59`;
         const data = await api.getRouteHistory(deviceId, from, to);
         setLocationHistory(data.reverse());
       } catch (err) {
@@ -91,24 +158,66 @@ const DevicePage: React.FC = () => {
       }
     };
     fetchHistory();
-  }, [deviceId]);
+  }, [deviceId, selectedDate]);
 
-  // Poll for Device Details every 5 seconds
+  // Replay animation loop
+  useEffect(() => {
+    if (!isReplaying || filteredHistory.length === 0) return;
+
+    const baseDuration = 450;
+    const intervalDuration = Math.max(40, baseDuration / replaySpeed);
+
+    const timer = setInterval(() => {
+      setReplayIndex((prevIndex) => {
+        if (prevIndex >= filteredHistory.length - 1) {
+          setIsReplaying(false);
+          return prevIndex;
+        }
+        return prevIndex + 1;
+      });
+    }, intervalDuration);
+
+    return () => clearInterval(timer);
+  }, [isReplaying, replaySpeed, filteredHistory.length]);
+
+  // Poll for Device Details and Command History every 5 seconds
   useEffect(() => {
     if (!deviceId) return;
 
     const fetchLiveData = async () => {
       try {
-        const detailData = await api.getDevice(deviceId);
+        const [detailData, commandsData] = await Promise.all([
+          api.getDevice(deviceId),
+          api.getCommandHistory(deviceId),
+        ]);
         setDeviceDetail(detailData);
+        setCommandHistory(commandsData);
       } catch (err) {
-        console.error('Failed to fetch live device details:', err);
+        console.error('Failed to fetch live device details or command history:', err);
       }
     };
 
     fetchLiveData(); // initial call
     const interval = setInterval(fetchLiveData, 5000);
     return () => clearInterval(interval);
+  }, [deviceId]);
+
+  const handleSendCommand = useCallback(async (command: CommandType) => {
+    if (!deviceId) return;
+    setSendingCommand(true);
+    setCommandStatus(null);
+    try {
+      const res = await api.sendCommand(deviceId, command);
+      setCommandStatus(`✅ ${res.message} (ID: ${res.commandId})`);
+      // Immediately refresh command history
+      const freshCommands = await api.getCommandHistory(deviceId);
+      setCommandHistory(freshCommands);
+    } catch (err) {
+      setCommandStatus(`❌ ${err instanceof Error ? err.message : 'Failed to send command'}`);
+    } finally {
+      setSendingCommand(false);
+      setTimeout(() => setCommandStatus(null), 5000);
+    }
   }, [deviceId]);
 
   if (!device) {
@@ -133,14 +242,29 @@ const DevicePage: React.FC = () => {
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
   const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
 
-  const trailPositions: [number, number][] = locationHistory
-    .filter((p) => p.latitude && p.longitude)
-    .map((p) => [p.latitude, p.longitude]);
+  const isGpsZero = (() => {
+    if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) return true;
+    const latVal = parseFloat(latitude as any);
+    const lngVal = parseFloat(longitude as any);
+    return isNaN(latVal) || isNaN(lngVal) || latVal === 0 || lngVal === 0;
+  })();
 
-  const mapCenter: [number, number] =
-    latitude !== null && longitude !== null
-      ? [latitude, longitude]
-      : [19.8762, 75.3433];
+  const trailPositions: [number, number][] = filteredHistory.map((p) => [p.latitude, p.longitude]);
+
+  const replayPoint = filteredHistory[replayIndex] || null;
+  const replayMarkerPosition: [number, number] | null = replayPoint && replayPoint.latitude && replayPoint.longitude
+    ? [replayPoint.latitude, replayPoint.longitude]
+    : null;
+
+  const mapCenter: [number, number] = (() => {
+    if (!isGpsZero && latitude !== null && longitude !== null) {
+      return [parseFloat(latitude as any), parseFloat(longitude as any)];
+    }
+    if (trailPositions.length > 0) {
+      return trailPositions[trailPositions.length - 1];
+    }
+    return [19.8762, 75.3433];
+  })();
 
   const timeAgo = () => {
     const dateStr = device.lastSeen;
@@ -275,15 +399,32 @@ const DevicePage: React.FC = () => {
 
       {/* Live Track Map */}
       <div>
-        <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">
-          Live Tracking
-          {!loadingHistory && trailPositions.length > 0 && (
-            <span className="text-surface-500 font-normal ml-2">
-              ({trailPositions.length} points, last 24h)
-            </span>
-          )}
-        </h3>
-        <div className="rounded-2xl overflow-hidden h-[400px]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider">
+            Route Tracking
+            {!loadingHistory && trailPositions.length > 0 && (
+              <span className="text-surface-500 font-normal ml-2 font-mono">
+                ({trailPositions.length} points)
+              </span>
+            )}
+            {loadingHistory && (
+              <span className="text-fleet-400 font-normal ml-2 animate-pulse text-xs lowercase">
+                (loading history...)
+              </span>
+            )}
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-surface-400 font-medium">Select Date:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-surface-800/80 border border-surface-700/60 rounded-lg px-3 py-1.5 text-xs text-surface-200 focus:outline-none focus:border-fleet-500 focus:ring-1 focus:ring-fleet-500 transition-colors font-medium cursor-pointer"
+            />
+          </div>
+        </div>
+        <div className="rounded-2xl overflow-hidden h-[400px] relative">
           <MapContainer
             center={mapCenter}
             zoom={15}
@@ -307,8 +448,19 @@ const DevicePage: React.FC = () => {
               />
             )}
 
+            {/* Replay marker tracking vehicle movement */}
+            {replayMarkerPosition && (isReplaying || replayIndex > 0) && (
+              <Marker
+                position={replayMarkerPosition}
+                icon={createReplayMarkerIcon()}
+              />
+            )}
+
+            {/* Replay Map Auto-pan Controller */}
+            <ReplayMapPanController position={replayMarkerPosition} isPlaying={isReplaying} />
+
             {/* Current position marker */}
-            {latitude !== null && longitude !== null && (
+            {latitude !== null && longitude !== null && !isGpsZero && (
               <Marker
                 position={[latitude, longitude]}
                 icon={icon}
@@ -371,8 +523,118 @@ const DevicePage: React.FC = () => {
               </Marker>
             )}
           </MapContainer>
+
+          {/* GPS Zero Indicator Overlay */}
+          {isGpsZero && (
+            <div className="absolute top-4 right-4 z-[1000] bg-danger-500/95 text-white font-semibold text-xs px-3 py-2 rounded-lg shadow-lg border border-danger-400 animate-pulse">
+              🚨 {device.deviceId}: Lat/Long Zero (GPS Error)
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Route Replay Control Panel */}
+      {!loadingHistory && (
+        <div className="glass-card p-4 space-y-4 animate-fade-in border border-surface-700/50">
+          {filteredHistory.length <= 1 ? (
+            <div className="text-center py-2 text-surface-400 text-xs flex items-center justify-center gap-2">
+              <span>ℹ️</span> No location history recorded for this date.
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Playback Controls */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsReplaying(!isReplaying)}
+                    className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${
+                      isReplaying 
+                        ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25' 
+                        : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
+                    }`}
+                    title={isReplaying ? 'Pause Replay' : 'Play Replay'}
+                  >
+                    {isReplaying ? '⏸' : '▶'}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setIsReplaying(false);
+                      setReplayIndex(0);
+                    }}
+                    className="btn bg-surface-700 hover:bg-surface-600 text-surface-200 flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all"
+                    title="Stop Replay"
+                  >
+                    ⏹
+                  </button>
+
+                  {/* Speed Select */}
+                  <div className="flex items-center gap-1 bg-surface-800 p-1 rounded-lg border border-surface-700">
+                    {[1, 2, 5, 10].map((speedVal) => (
+                      <button
+                        key={speedVal}
+                        onClick={() => setReplaySpeed(speedVal)}
+                        className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${
+                          replaySpeed === speedVal
+                            ? 'bg-fleet-500 text-white'
+                            : 'text-surface-400 hover:text-surface-200'
+                        }`}
+                      >
+                        {speedVal}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Timeline Slider */}
+                <div className="flex-1 flex items-center gap-3">
+                  <span className="text-[10px] text-surface-500 font-mono">Start</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={filteredHistory.length - 1}
+                    value={replayIndex}
+                    onChange={(e) => {
+                      setIsReplaying(false); // pause play when scrubbing
+                      setReplayIndex(Number(e.target.value));
+                    }}
+                    className="flex-1 accent-fleet-400 cursor-pointer h-1 bg-surface-700 rounded-lg appearance-none"
+                  />
+                  <span className="text-[10px] text-surface-500 font-mono">End</span>
+                </div>
+              </div>
+
+              {/* Current Animation Position Stats Box */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-800/60 p-3 rounded-xl border border-surface-700/40 text-xs">
+                <div>
+                  <span className="text-surface-500 block">Current Coordinate</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.latitude?.toFixed(5) ?? '—'}, {replayPoint?.longitude?.toFixed(5) ?? '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-surface-500 block">Telemetry Speed</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.speed?.toFixed(1) ?? '0.0'} km/h
+                  </span>
+                </div>
+                <div>
+                  <span className="text-surface-500 block">Timestamp (IST)</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-surface-500 block">Progress</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayIndex + 1} / {filteredHistory.length} points
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* System Health, IMU, and SOS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -450,7 +712,121 @@ const DevicePage: React.FC = () => {
 
       {/* SOS Events Section (Removed from UI) */}
 
-      {/* Remote Commands & History (Removed from UI) */}
+      {/* Remote Commands & History */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider">
+          Remote Management & Command Logs
+        </h3>
+        <div className="glass-card p-5">
+          <p className="text-xs text-surface-500 mb-4">
+            Send remote commands to <span className="text-fleet-400 font-mono">{device.deviceId}</span>
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {AVAILABLE_COMMANDS.map((cmd) => (
+              <button
+                key={cmd.value}
+                onClick={() => handleSendCommand(cmd.value)}
+                disabled={sendingCommand}
+                className="btn btn--ghost text-xs py-2.5 flex flex-col items-center justify-center gap-1 hover:bg-surface-800 transition-all border border-surface-700/30 rounded-xl"
+              >
+                <span className="text-lg">{cmd.icon}</span>
+                <span>{cmd.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Command Input Form */}
+          <div className="mt-4 p-4 bg-surface-800/40 rounded-xl border border-surface-700/30">
+            <h4 className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider mb-2">
+              Send Custom Instruction
+            </h4>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const customCmd = formData.get('customCommand') as string;
+                if (customCmd.trim()) {
+                  handleSendCommand(customCmd.trim().toUpperCase());
+                  e.currentTarget.reset();
+                }
+              }}
+              className="flex gap-2 max-w-lg"
+            >
+              <input
+                type="text"
+                name="customCommand"
+                placeholder="Enter custom command (e.g. RESET_SOS, START_SOS, REBOOT_DEVICE)"
+                className="flex-1 px-3 py-1.5 text-xs bg-surface-900 border border-surface-700 rounded-lg text-white placeholder-surface-500 focus:outline-none focus:border-fleet-400 focus:ring-1 focus:ring-fleet-400/25"
+                disabled={sendingCommand}
+              />
+              <button
+                type="submit"
+                disabled={sendingCommand}
+                className="btn btn--primary text-xs py-1.5 px-4 bg-fleet-600 hover:bg-fleet-500 text-white rounded-lg transition-all"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+
+          {commandStatus && (
+            <p className="text-sm text-surface-300 mt-3 animate-fade-in font-mono">{commandStatus}</p>
+          )}
+
+          {/* Command History Table */}
+          <div className="mt-6 pt-6 border-t border-surface-800">
+            <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">
+              Command Execution History
+            </h4>
+            {commandHistory.length === 0 ? (
+              <p className="text-xs text-surface-500 italic">No remote commands sent to this device yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-surface-300">
+                  <thead>
+                    <tr className="border-b border-surface-800 text-surface-500 uppercase tracking-wider text-[10px]">
+                      <th className="py-2">Command</th>
+                      <th className="py-2">Status</th>
+                      <th className="py-2">Sent At</th>
+                      <th className="py-2">Executed At</th>
+                      <th className="py-2">Response</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-800/40">
+                    {commandHistory.map((cmd) => (
+                      <tr key={cmd.id} className="hover:bg-surface-800/20">
+                        <td className="py-2.5 font-mono text-[11px] text-white">{cmd.command}</td>
+                        <td className="py-2.5">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
+                            cmd.status === 'executed'
+                              ? 'bg-fleet-500/15 text-fleet-400'
+                              : cmd.status === 'failed'
+                                ? 'bg-danger-500/15 text-danger-400'
+                                : 'bg-warning-500/15 text-warning-400'
+                          }`}>
+                            {cmd.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-surface-400 font-mono text-[11px]">
+                          {new Date(cmd.createdAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 text-surface-400 font-mono text-[11px]">
+                          {cmd.executedAt 
+                            ? new Date(cmd.executedAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                            : '—'}
+                        </td>
+                        <td className="py-2.5 max-w-[200px] truncate text-[11px] text-surface-400" title={cmd.response || ''}>
+                          {cmd.response || <span className="text-surface-600 italic">Waiting for Pi...</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <RemoteAccessPanel deviceId={device.deviceId} />
     </div>

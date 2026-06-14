@@ -10,7 +10,6 @@ interface AlertFeedProps {
 const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
   const alerts = useLatestAlerts(maxAlerts);
   const allAlerts = useFleetStore((s) => s.alerts);
-  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
 
   const handleResolve = useCallback(async (alertId: number) => {
@@ -20,6 +19,13 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
+        // For SOS alerts, automatically send the RESET_SOS command to the device
+        if (alert.type === 'SOS') {
+          await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>
+            console.error('Failed to send RESET_SOS command:', e)
+          );
+        }
+
         // Mark resolved in store (keeps it visible as resolved) instead of removing
         resolveAlertInStore(alertId, res.resolvedAt);
       }
@@ -30,7 +36,7 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
   // Count all unresolved alerts in store
   const unresolvedCount = allAlerts.filter(
-    (a) => !a.resolved && !globalManuallyResolvedIds.has(a.id)
+    (a) => !a.resolved
   ).length;
 
   return (

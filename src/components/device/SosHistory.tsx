@@ -23,7 +23,6 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
   const [events, setEvents] = useState<SosEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const alertsFromStore = useFleetStore((s) => s.alerts);
-  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -46,7 +45,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
 
           if (matchedAlert) {
             matchedAlertIds.add(matchedAlert.id);
-            const isResolved = matchedAlert.resolved || globalManuallyResolvedIds.has(matchedAlert.id);
+            const isResolved = matchedAlert.resolved;
             return {
               ...event,
               resolved: isResolved,
@@ -67,7 +66,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
         const unmatchedEvents = sosAlerts
           .filter((a) => !matchedAlertIds.has(a.id))
           .map((a) => {
-            const isResolved = a.resolved || globalManuallyResolvedIds.has(a.id);
+            const isResolved = a.resolved;
             return {
               id: -a.id,
               deviceId: a.deviceId,
@@ -90,7 +89,7 @@ const SosHistory: React.FC<SosHistoryProps> = ({ deviceId }) => {
       }
     };
     fetchEvents();
-  }, [deviceId, globalManuallyResolvedIds, alertsFromStore]);
+  }, [deviceId, alertsFromStore]);
 
   const formatDate = (iso: string) => {
     let clean = iso;
