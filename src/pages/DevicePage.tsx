@@ -108,6 +108,16 @@ const DevicePage: React.FC = () => {
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [replaySpeed, setReplaySpeed] = useState(1); // 1x, 2x, 5x, 10x
+  const filteredHistory = useMemo(() => {
+    return locationHistory.filter(
+      (p) =>
+        p.latitude !== null &&
+        p.longitude !== null &&
+        p.latitude !== undefined &&
+        p.longitude !== undefined &&
+        (p.latitude !== 0 || p.longitude !== 0)
+    );
+  }, [locationHistory]);
   const [sendingCommand, setSendingCommand] = useState(false);
   const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
@@ -154,14 +164,14 @@ const DevicePage: React.FC = () => {
 
   // Replay animation loop
   useEffect(() => {
-    if (!isReplaying || locationHistory.length === 0) return;
+    if (!isReplaying || filteredHistory.length === 0) return;
 
     const baseDuration = 450;
     const intervalDuration = Math.max(40, baseDuration / replaySpeed);
 
     const timer = setInterval(() => {
       setReplayIndex((prevIndex) => {
-        if (prevIndex >= locationHistory.length - 1) {
+        if (prevIndex >= filteredHistory.length - 1) {
           setIsReplaying(false);
           return prevIndex;
         }
@@ -170,7 +180,7 @@ const DevicePage: React.FC = () => {
     }, intervalDuration);
 
     return () => clearInterval(timer);
-  }, [isReplaying, replaySpeed, locationHistory.length]);
+  }, [isReplaying, replaySpeed, filteredHistory.length]);
 
   // Poll for Device Details and Command History every 5 seconds
   useEffect(() => {
@@ -236,11 +246,9 @@ const DevicePage: React.FC = () => {
 
   const isGpsZero = latitude === 0 && longitude === 0;
 
-  const trailPositions: [number, number][] = locationHistory
-    .filter((p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && (p.latitude !== 0 || p.longitude !== 0))
-    .map((p) => [p.latitude, p.longitude]);
+  const trailPositions: [number, number][] = filteredHistory.map((p) => [p.latitude, p.longitude]);
 
-  const replayPoint = locationHistory[replayIndex] || null;
+  const replayPoint = filteredHistory[replayIndex] || null;
   const replayMarkerPosition: [number, number] | null = replayPoint && replayPoint.latitude && replayPoint.longitude
     ? [replayPoint.latitude, replayPoint.longitude]
     : null;
@@ -525,7 +533,7 @@ const DevicePage: React.FC = () => {
       {/* Route Replay Control Panel */}
       {!loadingHistory && (
         <div className="glass-card p-4 space-y-4 animate-fade-in border border-surface-700/50">
-          {locationHistory.length <= 1 ? (
+          {filteredHistory.length <= 1 ? (
             <div className="text-center py-2 text-surface-400 text-xs flex items-center justify-center gap-2">
               <span>ℹ️</span> No location history recorded for this date.
             </div>
@@ -581,7 +589,7 @@ const DevicePage: React.FC = () => {
                   <input
                     type="range"
                     min={0}
-                    max={locationHistory.length - 1}
+                    max={filteredHistory.length - 1}
                     value={replayIndex}
                     onChange={(e) => {
                       setIsReplaying(false); // pause play when scrubbing
@@ -608,15 +616,15 @@ const DevicePage: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-surface-500 block">Timestamp</span>
+                  <span className="text-surface-500 block">Timestamp (IST)</span>
                   <span className="text-surface-200 font-mono font-medium">
-                    {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString() : '—'}
+                    {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
                   </span>
                 </div>
                 <div className="text-right">
                   <span className="text-surface-500 block">Progress</span>
                   <span className="text-surface-200 font-mono font-medium">
-                    {replayIndex + 1} / {locationHistory.length} points
+                    {replayIndex + 1} / {filteredHistory.length} points
                   </span>
                 </div>
               </div>
