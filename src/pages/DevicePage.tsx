@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
@@ -37,33 +37,41 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
   });
 }
 
-function getBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const lat1Rad = (lat1 * Math.PI) / 180;
-  const lat2Rad = (lat2 * Math.PI) / 180;
-
-  const y = Math.sin(dLng) * Math.cos(lat2Rad);
-  const x =
-    Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
-  const brng = (Math.atan2(y, x) * 180) / Math.PI;
-  return (brng + 360) % 360;
-}
-
-function createArrowIcon(rotation: number): L.DivIcon {
-  return L.divIcon({
+function createReplayMarkerIcon(): L.DivIcon {
+  return L.DivIcon ? L.divIcon({
+    className: 'custom-replay-marker',
     html: `
-      <div style="transform: rotate(${rotation}deg); display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L22 22L12 17L2 22L12 2Z" fill="#10b981" stroke="#047857" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
+      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+        <div style="
+          position: absolute; width: 100%; height: 100%;
+          background: #3b82f6;
+          border-radius: 50%;
+          opacity: 0.3;
+          animation: pulse 1.5s ease-in-out infinite;
+        "></div>
+        <div style="
+          position: absolute; width: 14px; height: 14px;
+          background: #3b82f6;
+          border: 2px solid white;
+          border-radius: 50%;
+          box-shadow: 0 0 8px #3b82f6;
+        "></div>
       </div>
     `,
-    className: 'custom-arrow-icon',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  }) : {} as L.DivIcon;
 }
+
+const ReplayMapPanController: React.FC<{ position: [number, number] | null; isPlaying: boolean }> = ({ position, isPlaying }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (isPlaying && position) {
+      map.panTo(position);
+    }
+  }, [position, isPlaying, map]);
+  return null;
+};
 
 const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
   { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
@@ -97,6 +105,9 @@ const DevicePage: React.FC = () => {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [replaySpeed, setReplaySpeed] = useState(1); // 1x, 2x, 5x, 10x
   const [sendingCommand, setSendingCommand] = useState(false);
   const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
@@ -125,6 +136,8 @@ const DevicePage: React.FC = () => {
     if (!deviceId) return;
     const fetchHistory = async () => {
       setLoadingHistory(true);
+      setIsReplaying(false);
+      setReplayIndex(0);
       try {
         const from = `${selectedDate}T00:00:00`;
         const to = `${selectedDate}T23:59:59`;
@@ -138,6 +151,26 @@ const DevicePage: React.FC = () => {
     };
     fetchHistory();
   }, [deviceId, selectedDate]);
+
+  // Replay animation loop
+  useEffect(() => {
+    if (!isReplaying || locationHistory.length === 0) return;
+
+    const baseDuration = 450;
+    const intervalDuration = Math.max(40, baseDuration / replaySpeed);
+
+    const timer = setInterval(() => {
+      setReplayIndex((prevIndex) => {
+        if (prevIndex >= locationHistory.length - 1) {
+          setIsReplaying(false);
+          return prevIndex;
+        }
+        return prevIndex + 1;
+      });
+    }, intervalDuration);
+
+    return () => clearInterval(timer);
+  }, [isReplaying, replaySpeed, locationHistory.length]);
 
   // Poll for Device Details and Command History every 5 seconds
   useEffect(() => {
@@ -207,23 +240,10 @@ const DevicePage: React.FC = () => {
     .filter((p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && (p.latitude !== 0 || p.longitude !== 0))
     .map((p) => [p.latitude, p.longitude]);
 
-  const arrowMarkers = useMemo(() => {
-    if (trailPositions.length < 2) return [];
-    const markers: { key: string; position: [number, number]; rotation: number }[] = [];
-    const step = Math.max(3, Math.floor(trailPositions.length / 10));
-    for (let i = 0; i < trailPositions.length - 1; i += step) {
-      const p1 = trailPositions[i];
-      const p2 = trailPositions[i + 1];
-      if (!p1 || !p2) continue;
-      const rotation = getBearing(p1[0], p1[1], p2[0], p2[1]);
-      markers.push({
-        key: `arrow-${i}-${p1[0]}-${p1[1]}`,
-        position: p1,
-        rotation,
-      });
-    }
-    return markers;
-  }, [trailPositions]);
+  const replayPoint = locationHistory[replayIndex] || null;
+  const replayMarkerPosition: [number, number] | null = replayPoint && replayPoint.latitude && replayPoint.longitude
+    ? [replayPoint.latitude, replayPoint.longitude]
+    : null;
 
   const mapCenter: [number, number] = (() => {
     if (latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0) {
@@ -406,26 +426,27 @@ const DevicePage: React.FC = () => {
 
             {/* Location history trail */}
             {trailPositions.length > 1 && (
-              <>
-                <Polyline
-                  positions={trailPositions}
-                  pathOptions={{
-                    color: '#22c55e',
-                    weight: 3,
-                    opacity: 0.6,
-                    dashArray: '8 4',
-                  }}
-                />
-                {arrowMarkers.map((m) => (
-                  <Marker
-                    key={m.key}
-                    position={m.position}
-                    icon={createArrowIcon(m.rotation)}
-                    interactive={false}
-                  />
-                ))}
-              </>
+              <Polyline
+                positions={trailPositions}
+                pathOptions={{
+                  color: '#22c55e',
+                  weight: 3,
+                  opacity: 0.6,
+                  dashArray: '8 4',
+                }}
+              />
             )}
+
+            {/* Replay marker tracking vehicle movement */}
+            {replayMarkerPosition && (isReplaying || replayIndex > 0) && (
+              <Marker
+                position={replayMarkerPosition}
+                icon={createReplayMarkerIcon()}
+              />
+            )}
+
+            {/* Replay Map Auto-pan Controller */}
+            <ReplayMapPanController position={replayMarkerPosition} isPlaying={isReplaying} />
 
             {/* Current position marker */}
             {latitude !== null && longitude !== null && !isGpsZero && (
@@ -500,6 +521,101 @@ const DevicePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Route Replay Control Panel */}
+      {!loadingHistory && locationHistory.length > 1 && (
+        <div className="glass-card p-4 space-y-4 animate-fade-in border border-surface-700/50">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Playback Controls */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsReplaying(!isReplaying)}
+                className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${
+                  isReplaying 
+                    ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25' 
+                    : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
+                }`}
+                title={isReplaying ? 'Pause Replay' : 'Play Replay'}
+              >
+                {isReplaying ? '⏸' : '▶'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  setIsReplaying(false);
+                  setReplayIndex(0);
+                }}
+                className="btn bg-surface-700 hover:bg-surface-600 text-surface-200 flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all"
+                title="Stop Replay"
+              >
+                ⏹
+              </button>
+
+              {/* Speed Select */}
+              <div className="flex items-center gap-1 bg-surface-800 p-1 rounded-lg border border-surface-700">
+                {[1, 2, 5, 10].map((speedVal) => (
+                  <button
+                    key={speedVal}
+                    onClick={() => setReplaySpeed(speedVal)}
+                    className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${
+                      replaySpeed === speedVal
+                        ? 'bg-fleet-500 text-white'
+                        : 'text-surface-400 hover:text-surface-200'
+                    }`}
+                  >
+                    {speedVal}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Timeline Slider */}
+            <div className="flex-1 flex items-center gap-3">
+              <span className="text-[10px] text-surface-500 font-mono">Start</span>
+              <input
+                type="range"
+                min={0}
+                max={locationHistory.length - 1}
+                value={replayIndex}
+                onChange={(e) => {
+                  setIsReplaying(false); // pause play when scrubbing
+                  setReplayIndex(Number(e.target.value));
+                }}
+                className="flex-1 accent-fleet-400 cursor-pointer h-1 bg-surface-700 rounded-lg appearance-none"
+              />
+              <span className="text-[10px] text-surface-500 font-mono">End</span>
+            </div>
+          </div>
+
+          {/* Current Animation Position Stats Box */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-800/60 p-3 rounded-xl border border-surface-700/40 text-xs">
+            <div>
+              <span className="text-surface-500 block">Current Coordinate</span>
+              <span className="text-surface-200 font-mono font-medium">
+                {replayPoint?.latitude?.toFixed(5) ?? '—'}, {replayPoint?.longitude?.toFixed(5) ?? '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-surface-500 block">Telemetry Speed</span>
+              <span className="text-surface-200 font-mono font-medium">
+                {replayPoint?.speed?.toFixed(1) ?? '0.0'} km/h
+              </span>
+            </div>
+            <div>
+              <span className="text-surface-500 block">Timestamp</span>
+              <span className="text-surface-200 font-mono font-medium">
+                {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString() : '—'}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-surface-500 block">Progress</span>
+              <span className="text-surface-200 font-mono font-medium">
+                {replayIndex + 1} / {locationHistory.length} points
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* System Health, IMU, and SOS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
