@@ -109,14 +109,12 @@ const DevicePage: React.FC = () => {
   const [replayIndex, setReplayIndex] = useState(0);
   const [replaySpeed, setReplaySpeed] = useState(1); // 1x, 2x, 5x, 10x
   const filteredHistory = useMemo(() => {
-    return locationHistory.filter(
-      (p) =>
-        p.latitude !== null &&
-        p.longitude !== null &&
-        p.latitude !== undefined &&
-        p.longitude !== undefined &&
-        (p.latitude !== 0 || p.longitude !== 0)
-    );
+    return locationHistory.filter((p) => {
+      if (!p) return false;
+      const lat = parseFloat(p.latitude as any);
+      const lng = parseFloat(p.longitude as any);
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    });
   }, [locationHistory]);
   const [sendingCommand, setSendingCommand] = useState(false);
   const [commandStatus, setCommandStatus] = useState<string | null>(null);
@@ -244,7 +242,12 @@ const DevicePage: React.FC = () => {
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
   const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
 
-  const isGpsZero = latitude === 0 && longitude === 0;
+  const isGpsZero = (() => {
+    if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) return true;
+    const latVal = parseFloat(latitude as any);
+    const lngVal = parseFloat(longitude as any);
+    return isNaN(latVal) || isNaN(lngVal) || latVal === 0 || lngVal === 0;
+  })();
 
   const trailPositions: [number, number][] = filteredHistory.map((p) => [p.latitude, p.longitude]);
 
@@ -254,8 +257,8 @@ const DevicePage: React.FC = () => {
     : null;
 
   const mapCenter: [number, number] = (() => {
-    if (latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0) {
-      return [latitude, longitude];
+    if (!isGpsZero && latitude !== null && longitude !== null) {
+      return [parseFloat(latitude as any), parseFloat(longitude as any)];
     }
     if (trailPositions.length > 0) {
       return trailPositions[trailPositions.length - 1];
