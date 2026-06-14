@@ -523,97 +523,105 @@ const DevicePage: React.FC = () => {
       </div>
 
       {/* Route Replay Control Panel */}
-      {!loadingHistory && locationHistory.length > 1 && (
+      {!loadingHistory && (
         <div className="glass-card p-4 space-y-4 animate-fade-in border border-surface-700/50">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Playback Controls */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsReplaying(!isReplaying)}
-                className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${
-                  isReplaying 
-                    ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25' 
-                    : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
-                }`}
-                title={isReplaying ? 'Pause Replay' : 'Play Replay'}
-              >
-                {isReplaying ? '⏸' : '▶'}
-              </button>
-              
-              <button
-                onClick={() => {
-                  setIsReplaying(false);
-                  setReplayIndex(0);
-                }}
-                className="btn bg-surface-700 hover:bg-surface-600 text-surface-200 flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all"
-                title="Stop Replay"
-              >
-                ⏹
-              </button>
-
-              {/* Speed Select */}
-              <div className="flex items-center gap-1 bg-surface-800 p-1 rounded-lg border border-surface-700">
-                {[1, 2, 5, 10].map((speedVal) => (
+          {locationHistory.length <= 1 ? (
+            <div className="text-center py-2 text-surface-400 text-xs flex items-center justify-center gap-2">
+              <span>ℹ️</span> No location history recorded for this date.
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Playback Controls */}
+                <div className="flex items-center gap-3">
                   <button
-                    key={speedVal}
-                    onClick={() => setReplaySpeed(speedVal)}
-                    className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${
-                      replaySpeed === speedVal
-                        ? 'bg-fleet-500 text-white'
-                        : 'text-surface-400 hover:text-surface-200'
+                    onClick={() => setIsReplaying(!isReplaying)}
+                    className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${
+                      isReplaying 
+                        ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25' 
+                        : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
                     }`}
+                    title={isReplaying ? 'Pause Replay' : 'Play Replay'}
                   >
-                    {speedVal}x
+                    {isReplaying ? '⏸' : '▶'}
                   </button>
-                ))}
+                  
+                  <button
+                    onClick={() => {
+                      setIsReplaying(false);
+                      setReplayIndex(0);
+                    }}
+                    className="btn bg-surface-700 hover:bg-surface-600 text-surface-200 flex items-center justify-center w-10 h-10 rounded-full text-sm transition-all"
+                    title="Stop Replay"
+                  >
+                    ⏹
+                  </button>
+
+                  {/* Speed Select */}
+                  <div className="flex items-center gap-1 bg-surface-800 p-1 rounded-lg border border-surface-700">
+                    {[1, 2, 5, 10].map((speedVal) => (
+                      <button
+                        key={speedVal}
+                        onClick={() => setReplaySpeed(speedVal)}
+                        className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${
+                          replaySpeed === speedVal
+                            ? 'bg-fleet-500 text-white'
+                            : 'text-surface-400 hover:text-surface-200'
+                        }`}
+                      >
+                        {speedVal}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Timeline Slider */}
+                <div className="flex-1 flex items-center gap-3">
+                  <span className="text-[10px] text-surface-500 font-mono">Start</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={locationHistory.length - 1}
+                    value={replayIndex}
+                    onChange={(e) => {
+                      setIsReplaying(false); // pause play when scrubbing
+                      setReplayIndex(Number(e.target.value));
+                    }}
+                    className="flex-1 accent-fleet-400 cursor-pointer h-1 bg-surface-700 rounded-lg appearance-none"
+                  />
+                  <span className="text-[10px] text-surface-500 font-mono">End</span>
+                </div>
               </div>
-            </div>
 
-            {/* Timeline Slider */}
-            <div className="flex-1 flex items-center gap-3">
-              <span className="text-[10px] text-surface-500 font-mono">Start</span>
-              <input
-                type="range"
-                min={0}
-                max={locationHistory.length - 1}
-                value={replayIndex}
-                onChange={(e) => {
-                  setIsReplaying(false); // pause play when scrubbing
-                  setReplayIndex(Number(e.target.value));
-                }}
-                className="flex-1 accent-fleet-400 cursor-pointer h-1 bg-surface-700 rounded-lg appearance-none"
-              />
-              <span className="text-[10px] text-surface-500 font-mono">End</span>
-            </div>
-          </div>
-
-          {/* Current Animation Position Stats Box */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-800/60 p-3 rounded-xl border border-surface-700/40 text-xs">
-            <div>
-              <span className="text-surface-500 block">Current Coordinate</span>
-              <span className="text-surface-200 font-mono font-medium">
-                {replayPoint?.latitude?.toFixed(5) ?? '—'}, {replayPoint?.longitude?.toFixed(5) ?? '—'}
-              </span>
-            </div>
-            <div>
-              <span className="text-surface-500 block">Telemetry Speed</span>
-              <span className="text-surface-200 font-mono font-medium">
-                {replayPoint?.speed?.toFixed(1) ?? '0.0'} km/h
-              </span>
-            </div>
-            <div>
-              <span className="text-surface-500 block">Timestamp</span>
-              <span className="text-surface-200 font-mono font-medium">
-                {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString() : '—'}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-surface-500 block">Progress</span>
-              <span className="text-surface-200 font-mono font-medium">
-                {replayIndex + 1} / {locationHistory.length} points
-              </span>
-            </div>
-          </div>
+              {/* Current Animation Position Stats Box */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-800/60 p-3 rounded-xl border border-surface-700/40 text-xs">
+                <div>
+                  <span className="text-surface-500 block">Current Coordinate</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.latitude?.toFixed(5) ?? '—'}, {replayPoint?.longitude?.toFixed(5) ?? '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-surface-500 block">Telemetry Speed</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.speed?.toFixed(1) ?? '0.0'} km/h
+                  </span>
+                </div>
+                <div>
+                  <span className="text-surface-500 block">Timestamp</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayPoint?.timestamp ? new Date(replayPoint.timestamp).toLocaleTimeString() : '—'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-surface-500 block">Progress</span>
+                  <span className="text-surface-200 font-mono font-medium">
+                    {replayIndex + 1} / {locationHistory.length} points
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
