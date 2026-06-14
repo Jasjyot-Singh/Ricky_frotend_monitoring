@@ -21,6 +21,15 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    to: '/calculator',
+    label: 'Impression Calculator',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-3-3v3h.008v-.008H12.75zm-6 0h.008v-.008H6.75zm-.008-3h.008v-.008H6.742zm0-3h.008v-.008H6.742zm3 6h.008v-.008H9.75zm0-3h.008v-.008H9.75zm0-3h.008v-.008H9.75zm3 0h.008v-.008h-.008zm0 3h.008v-.008h-.008zm3-10.5a.75.75 0 01.75.75v6.75a.75.75 0 01-.75.75H3.75a.75.75 0 01-.75-.75V3.75a.75.75 0 01.75-.75h12zm0 9H3.75v-9H15.75v9z" />
+      </svg>
+    ),
+  },
 ];
 
 const Sidebar: React.FC = () => {
