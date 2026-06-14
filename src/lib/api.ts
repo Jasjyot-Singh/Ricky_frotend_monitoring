@@ -135,6 +135,14 @@ export const api = {
     );
   },
 
+  /** Fetch raw telemetry logs for a device */
+  getTelemetryLogs: (deviceId: string, fromDate: string, toDate: string) => {
+    const params = new URLSearchParams({ fromDate, toDate });
+    return apiFetch<{ timestamp: string; charging: boolean }[]>(
+      `/api/v1/devices/${deviceId}/telemetry-logs?${params}`,
+    );
+  },
+
   /** Fetch SOS event history for a device */
   getSosHistory: (deviceId: string) =>
     apiFetch<SosEvent[]>(`/api/v1/devices/${deviceId}/sos-history`),
