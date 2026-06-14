@@ -6,7 +6,7 @@ import FleetOverview from './pages/FleetOverview';
 import DevicePage from './pages/DevicePage';
 import AlertsPage from './pages/AlertsPage';
 import LoginPage from './pages/LoginPage';
-import CalculatorPage from './pages/CalculatorPage';
+import ImpressionCalculatorPage from './pages/ImpressionCalculatorPage';
 
 /** Auth guard — redirects to login if not authenticated */
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -34,7 +34,7 @@ function AppContent() {
         <Route index element={<FleetOverview />} />
         <Route path="/device/:deviceId" element={<DevicePage />} />
         <Route path="/alerts" element={<AlertsPage />} />
-        <Route path="/calculator" element={<CalculatorPage />} />
+        <Route path="/calculator" element={<ImpressionCalculatorPage />} />
       </Route>
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

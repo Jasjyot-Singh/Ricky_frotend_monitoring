@@ -26,7 +26,7 @@ const navItems = [
     label: 'Impression Calculator',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 19.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-3-3v3h.008v-.008H12.75zm-6 0h.008v-.008H6.75zm-.008-3h.008v-.008H6.742zm0-3h.008v-.008H6.742zm3 6h.008v-.008H9.75zm0-3h.008v-.008H9.75zm0-3h.008v-.008H9.75zm3 0h.008v-.008h-.008zm0 3h.008v-.008h-.008zm3-10.5a.75.75 0 01.75.75v6.75a.75.75 0 01-.75.75H3.75a.75.75 0 01-.75-.75V3.75a.75.75 0 01.75-.75h12zm0 9H3.75v-9H15.75v9z" />
       </svg>
     ),
   },
