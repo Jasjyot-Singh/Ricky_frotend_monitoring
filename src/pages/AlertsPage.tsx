@@ -26,7 +26,6 @@ const AlertsPage: React.FC = () => {
   const alertsFromStore = useFleetStore((s) => s.alerts);
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
-  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const devices = useDeviceList();
 
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
@@ -70,13 +69,13 @@ const AlertsPage: React.FC = () => {
         }
         const data = await api.getAllAlerts();
         if (!active) return;
-        // Sync resolved state from database, or check if operator manually resolved it in this session
+        // Sync resolved state from database
         const enriched = data.map((a) => ({
           ...a,
           latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
           longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
-          resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
-          resolvedAt: a.resolved ? (a.resolvedAt || a.createdAt) : (globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null),
+          resolved: a.resolved,
+          resolvedAt: a.resolved ? (a.resolvedAt || a.createdAt) : null,
         }));
         setAllAlerts(enriched);
         setError(null);
@@ -96,7 +95,7 @@ const AlertsPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [alertsFromStore, globalManuallyResolvedIds]); // Refresh if store alerts or global resolutions change
+  }, [alertsFromStore]); // Refresh if store alerts change
 
   // Handle resolving an alert (only called by explicit operator button click)
   const handleResolve = async (alertId: number) => {
@@ -107,11 +106,6 @@ const AlertsPage: React.FC = () => {
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Send manual resolve persistence command
-        await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`).catch((e) =>
-          console.error('Failed to persist manual resolution in command logs:', e)
-        );
-
         // For SOS alerts, automatically send the RESET_SOS command to the device
         if (alert.type === 'SOS') {
           await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>

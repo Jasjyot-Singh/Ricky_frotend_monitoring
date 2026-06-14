@@ -6,7 +6,6 @@ import { getAlertSeverity } from '../types/fleet.types';
 
 const MAX_ALERTS = 100;
 const CLOCK_OFFSET_KEY = 'ricky_clock_offset';
-const MANUALLY_RESOLVED_KEY = 'ricky_manually_resolved_alerts';
 
 /** Read persisted clock offset from sessionStorage (survives soft page refresh) */
 function getPersistedClockOffset(): number {
@@ -24,21 +23,6 @@ function persistClockOffset(offset: number): void {
   } catch { /* ignore */ }
 }
 
-function getPersistedManuallyResolved(): Set<number> {
-  try {
-    const v = localStorage.getItem(MANUALLY_RESOLVED_KEY);
-    return v ? new Set(JSON.parse(v)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function persistManuallyResolved(ids: Set<number>): void {
-  try {
-    localStorage.setItem(MANUALLY_RESOLVED_KEY, JSON.stringify(Array.from(ids)));
-  } catch { /* ignore */ }
-}
-
 interface FleetState {
   // ─── Device State ──────────────────────────────────
   devices: Record<string, DeviceStatus>;
@@ -50,7 +34,6 @@ interface FleetState {
 
   // ─── Alerts ────────────────────────────────────────
   alerts: Alert[];
-  globalManuallyResolvedIds: Set<number>;
 
   // ─── Actions ───────────────────────────────────────
   setFleetSnapshot: (devices: DeviceStatus[]) => void;
@@ -64,7 +47,6 @@ interface FleetState {
   setAlertsSnapshot: (alerts: Alert[]) => void;
   setServerClockOffset: (offset: number) => void;
   resolveAlertInStore: (alertId: number, resolvedAt: string) => void;
-  setGlobalManuallyResolvedIds: (ids: Set<number>) => void;
 }
 
 /** Normalize flat LiveStatus from WebSocket update into nested DeviceStatus expected by frontend */
@@ -161,7 +143,6 @@ export const useFleetStore = create<FleetState>((set) => ({
   serverClockOffset: getPersistedClockOffset(),
   fleetStats: null,
   alerts: [],
-  globalManuallyResolvedIds: getPersistedManuallyResolved(),
 
   setFleetSnapshot: (devices) =>
     set(() => {
@@ -220,23 +201,11 @@ export const useFleetStore = create<FleetState>((set) => ({
   },
 
   resolveAlertInStore: (alertId, resolvedAt) =>
-    set((state) => {
-      const nextSet = new Set(state.globalManuallyResolvedIds);
-      nextSet.add(alertId);
-      persistManuallyResolved(nextSet);
-      return {
-        globalManuallyResolvedIds: nextSet,
-        alerts: state.alerts.map((a) =>
-          a.id === alertId ? { ...a, resolved: true, resolvedAt } : a
-        ),
-      };
-    }),
-
-  setGlobalManuallyResolvedIds: (ids) =>
-    set(() => {
-      persistManuallyResolved(ids);
-      return { globalManuallyResolvedIds: ids };
-    }),
+    set((state) => ({
+      alerts: state.alerts.map((a) =>
+        a.id === alertId ? { ...a, resolved: true, resolvedAt } : a
+      ),
+    })),
 }));
 
 // ─── Dynamic Status Computation Helper ────────────────────────────────────
@@ -334,12 +303,12 @@ export const useFleetStats = () =>
       // Extract set of device IDs with active (unresolved) SOS or LOW_BATTERY alerts
       const activeSOSDevices = new Set(
         s.alerts
-          .filter((a) => a.type === 'SOS' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
+          .filter((a) => a.type === 'SOS' && !a.resolved)
           .map((a) => a.deviceId)
       );
       const activeBatteryDevices = new Set(
         s.alerts
-          .filter((a) => a.type === 'LOW_BATTERY' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
+          .filter((a) => a.type === 'LOW_BATTERY' && !a.resolved)
           .map((a) => a.deviceId)
       );
 
@@ -383,17 +352,10 @@ export const useFleetStats = () =>
 /** Returns the latest N unresolved alerts, sorted by priority (CRITICAL -> WARNING -> INFO) and then by creation time */
 export const useLatestAlerts = (count = 20) => {
   const alerts = useFleetStore((s) => s.alerts);
-  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
 
   return useMemo(() => {
     const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-    // Enrich with database resolved status as well as manual resolutions
-    const enriched = alerts.map((a) => ({
-      ...a,
-      resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
-      resolvedAt: (a.resolved || globalManuallyResolvedIds.has(a.id)) ? (a.resolvedAt || a.createdAt) : null,
-    }));
-    const unresolved = enriched.filter((a) => !a.resolved);
+    const unresolved = alerts.filter((a) => !a.resolved);
     const sorted = unresolved.sort((a, b) => {
       const sevA = getAlertSeverity(a.type);
       const sevB = getAlertSeverity(b.type);
@@ -403,7 +365,7 @@ export const useLatestAlerts = (count = 20) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     return sorted.slice(0, count);
-  }, [alerts, globalManuallyResolvedIds, count]);
+  }, [alerts, count]);
 };
 
 /** Returns a sorted array of active SOS device IDs based on current unresolved alerts */
@@ -412,8 +374,7 @@ export const useActiveSosDeviceIds = () =>
     useShallow((s) => {
       const sosSet = new Set<string>();
       for (const a of s.alerts) {
-        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
-        if (!isResolved && a.type === 'SOS') {
+        if (!a.resolved && a.type === 'SOS') {
           sosSet.add(a.deviceId);
         }
       }
@@ -427,8 +388,7 @@ export const useActiveWarningDeviceIds = () =>
     useShallow((s) => {
       const warningSet = new Set<string>();
       for (const a of s.alerts) {
-        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
-        if (!isResolved) {
+        if (!a.resolved) {
           if (
             a.type === 'LOW_BATTERY' ||
             a.type === 'GPS_FAILURE' ||

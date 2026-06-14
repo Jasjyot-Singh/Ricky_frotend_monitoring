@@ -10,7 +10,6 @@ interface AlertFeedProps {
 const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
   const alerts = useLatestAlerts(maxAlerts);
   const allAlerts = useFleetStore((s) => s.alerts);
-  const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
 
   const handleResolve = useCallback(async (alertId: number) => {
@@ -20,11 +19,6 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // Send manual resolve persistence command
-        await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`).catch((e) =>
-          console.error('Failed to persist manual resolution in command logs:', e)
-        );
-
         // For SOS alerts, automatically send the RESET_SOS command to the device
         if (alert.type === 'SOS') {
           await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>
@@ -42,7 +36,7 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
   // Count all unresolved alerts in store
   const unresolvedCount = allAlerts.filter(
-    (a) => !a.resolved && !globalManuallyResolvedIds.has(a.id)
+    (a) => !a.resolved
   ).length;
 
   return (
