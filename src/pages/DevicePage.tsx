@@ -37,6 +37,34 @@ function createDetailMarkerIcon(color: string): L.DivIcon {
   });
 }
 
+function getBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+
+  const y = Math.sin(dLng) * Math.cos(lat2Rad);
+  const x =
+    Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+  const brng = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brng + 360) % 360;
+}
+
+function createArrowIcon(rotation: number): L.DivIcon {
+  return L.divIcon({
+    html: `
+      <div style="transform: rotate(${rotation}deg); display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L22 22L12 17L2 22L12 2Z" fill="#10b981" stroke="#047857" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    `,
+    className: 'custom-arrow-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
 const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
   { value: 'RESET_SOS', label: 'Close SOS', icon: '🟢' },
   { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
@@ -62,6 +90,13 @@ const DevicePage: React.FC = () => {
   const [commandHistory, setCommandHistory] = useState<DeviceCommand[]>([]);
   const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [sendingCommand, setSendingCommand] = useState(false);
   const [commandStatus, setCommandStatus] = useState<string | null>(null);
   const [secondsSinceLastSeen, setSecondsSinceLastSeen] = useState<number | null>(null);
@@ -84,14 +119,15 @@ const DevicePage: React.FC = () => {
     const timerInterval = setInterval(updateTimer, 1000);
     return () => clearInterval(timerInterval);
   }, [deviceDetail?.liveStatus.lastSeen, device?.lastSeen, serverClockOffset]);
-  // Fetch location history once on mount
+
+  // Fetch location history when deviceId or selectedDate changes
   useEffect(() => {
     if (!deviceId) return;
     const fetchHistory = async () => {
+      setLoadingHistory(true);
       try {
-        const today = new Date();
-        const from = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
-        const to = today.toISOString();
+        const from = `${selectedDate}T00:00:00`;
+        const to = `${selectedDate}T23:59:59`;
         const data = await api.getRouteHistory(deviceId, from, to);
         setLocationHistory(data.reverse());
       } catch (err) {
@@ -101,7 +137,7 @@ const DevicePage: React.FC = () => {
       }
     };
     fetchHistory();
-  }, [deviceId]);
+  }, [deviceId, selectedDate]);
 
   // Poll for Device Details and Command History every 5 seconds
   useEffect(() => {
@@ -170,6 +206,24 @@ const DevicePage: React.FC = () => {
   const trailPositions: [number, number][] = locationHistory
     .filter((p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && (p.latitude !== 0 || p.longitude !== 0))
     .map((p) => [p.latitude, p.longitude]);
+
+  const arrowMarkers = useMemo(() => {
+    if (trailPositions.length < 2) return [];
+    const markers: { key: string; position: [number, number]; rotation: number }[] = [];
+    const step = Math.max(3, Math.floor(trailPositions.length / 10));
+    for (let i = 0; i < trailPositions.length - 1; i += step) {
+      const p1 = trailPositions[i];
+      const p2 = trailPositions[i + 1];
+      if (!p1 || !p2) continue;
+      const rotation = getBearing(p1[0], p1[1], p2[0], p2[1]);
+      markers.push({
+        key: `arrow-${i}-${p1[0]}-${p1[1]}`,
+        position: p1,
+        rotation,
+      });
+    }
+    return markers;
+  }, [trailPositions]);
 
   const mapCenter: [number, number] = (() => {
     if (latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0) {
@@ -314,14 +368,31 @@ const DevicePage: React.FC = () => {
 
       {/* Live Track Map */}
       <div>
-        <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-4">
-          Live Tracking
-          {!loadingHistory && trailPositions.length > 0 && (
-            <span className="text-surface-500 font-normal ml-2">
-              ({trailPositions.length} points, last 24h)
-            </span>
-          )}
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider">
+            Route Tracking
+            {!loadingHistory && trailPositions.length > 0 && (
+              <span className="text-surface-500 font-normal ml-2 font-mono">
+                ({trailPositions.length} points)
+              </span>
+            )}
+            {loadingHistory && (
+              <span className="text-fleet-400 font-normal ml-2 animate-pulse text-xs lowercase">
+                (loading history...)
+              </span>
+            )}
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-surface-400 font-medium">Select Date:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-surface-800/80 border border-surface-700/60 rounded-lg px-3 py-1.5 text-xs text-surface-200 focus:outline-none focus:border-fleet-500 focus:ring-1 focus:ring-fleet-500 transition-colors font-medium cursor-pointer"
+            />
+          </div>
+        </div>
         <div className="rounded-2xl overflow-hidden h-[400px] relative">
           <MapContainer
             center={mapCenter}
@@ -335,15 +406,25 @@ const DevicePage: React.FC = () => {
 
             {/* Location history trail */}
             {trailPositions.length > 1 && (
-              <Polyline
-                positions={trailPositions}
-                pathOptions={{
-                  color: '#22c55e',
-                  weight: 3,
-                  opacity: 0.6,
-                  dashArray: '8 4',
-                }}
-              />
+              <>
+                <Polyline
+                  positions={trailPositions}
+                  pathOptions={{
+                    color: '#22c55e',
+                    weight: 3,
+                    opacity: 0.6,
+                    dashArray: '8 4',
+                  }}
+                />
+                {arrowMarkers.map((m) => (
+                  <Marker
+                    key={m.key}
+                    position={m.position}
+                    icon={createArrowIcon(m.rotation)}
+                    interactive={false}
+                  />
+                ))}
+              </>
             )}
 
             {/* Current position marker */}
