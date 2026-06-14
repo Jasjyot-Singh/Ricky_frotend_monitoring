@@ -70,13 +70,13 @@ const AlertsPage: React.FC = () => {
         }
         const data = await api.getAllAlerts();
         if (!active) return;
-        // Sync resolved state from database, or check if operator manually resolved it in this session (operator manual-only resolution)
+        // Sync resolved state from database, or check if operator manually resolved it in this session
         const enriched = data.map((a) => ({
           ...a,
           latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
           longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
-          resolved: globalManuallyResolvedIds.has(a.id),
-          resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+          resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
+          resolvedAt: a.resolved ? (a.resolvedAt || a.createdAt) : (globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null),
         }));
         setAllAlerts(enriched);
         setError(null);

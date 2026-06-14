@@ -40,9 +40,9 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
     }
   }, [alerts, resolveAlertInStore]);
 
-  // Count all unresolved alerts in store (operator manual-only resolution)
+  // Count all unresolved alerts in store
   const unresolvedCount = allAlerts.filter(
-    (a) => !globalManuallyResolvedIds.has(a.id)
+    (a) => !a.resolved && !globalManuallyResolvedIds.has(a.id)
   ).length;
 
   return (

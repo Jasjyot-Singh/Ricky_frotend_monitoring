@@ -332,15 +332,14 @@ export const useFleetStats = () =>
       let lowBattery = 0;
 
       // Extract set of device IDs with active (unresolved) SOS or LOW_BATTERY alerts
-      // Strictly ignore backend resolution state
       const activeSOSDevices = new Set(
         s.alerts
-          .filter((a) => a.type === 'SOS' && !s.globalManuallyResolvedIds.has(a.id))
+          .filter((a) => a.type === 'SOS' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
           .map((a) => a.deviceId)
       );
       const activeBatteryDevices = new Set(
         s.alerts
-          .filter((a) => a.type === 'LOW_BATTERY' && !s.globalManuallyResolvedIds.has(a.id))
+          .filter((a) => a.type === 'LOW_BATTERY' && !a.resolved && !s.globalManuallyResolvedIds.has(a.id))
           .map((a) => a.deviceId)
       );
 
@@ -388,11 +387,11 @@ export const useLatestAlerts = (count = 20) => {
 
   return useMemo(() => {
     const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, INFO: 2 };
-    // Enrich using ONLY local manual resolutions. Completely ignore backend-driven resolved state.
+    // Enrich with database resolved status as well as manual resolutions
     const enriched = alerts.map((a) => ({
       ...a,
-      resolved: globalManuallyResolvedIds.has(a.id),
-      resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
+      resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
+      resolvedAt: (a.resolved || globalManuallyResolvedIds.has(a.id)) ? (a.resolvedAt || a.createdAt) : null,
     }));
     const unresolved = enriched.filter((a) => !a.resolved);
     const sorted = unresolved.sort((a, b) => {
@@ -413,7 +412,7 @@ export const useActiveSosDeviceIds = () =>
     useShallow((s) => {
       const sosSet = new Set<string>();
       for (const a of s.alerts) {
-        const isResolved = s.globalManuallyResolvedIds.has(a.id);
+        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
         if (!isResolved && a.type === 'SOS') {
           sosSet.add(a.deviceId);
         }
@@ -428,7 +427,7 @@ export const useActiveWarningDeviceIds = () =>
     useShallow((s) => {
       const warningSet = new Set<string>();
       for (const a of s.alerts) {
-        const isResolved = s.globalManuallyResolvedIds.has(a.id);
+        const isResolved = a.resolved || s.globalManuallyResolvedIds.has(a.id);
         if (!isResolved) {
           if (
             a.type === 'LOW_BATTERY' ||
