@@ -18,13 +18,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-/** Auto-fits the map bounds to show all markers */
-const MapBoundsUpdater: React.FC = () => {
-  const allDevices = useMapDevices();
-  const devices = useMemo(() => {
-    return allDevices.filter((d) => !(d.latitude === 0 && d.longitude === 0));
-  }, [allDevices]);
+import type { DeviceStatus } from '../../types/fleet.types';
 
+/** Auto-fits the map bounds to show all markers */
+const MapBoundsUpdater: React.FC<{ devices: DeviceStatus[] }> = ({ devices }) => {
   const map = useMap();
 
   useMemo(() => {
@@ -37,7 +34,7 @@ const MapBoundsUpdater: React.FC = () => {
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     }
-  }, [devices.length]); // Only refit when device count changes
+  }, [devices, map]);
 
   return null;
 };
@@ -50,19 +47,11 @@ interface FleetMapProps {
 const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) => {
   const rawDevices = useMapDevices();
   const serverClockOffset = useFleetStore((s) => s.serverClockOffset);
-  const devices = useMemo(() => {
-    return rawDevices.map((d) => computeActiveStatus(d, serverClockOffset));
-  }, [rawDevices, serverClockOffset]);
+  const devices = rawDevices.map((d) => computeActiveStatus(d, serverClockOffset));
 
-  // Find any devices that have coordinates (0, 0)
-  const zeroDevices = useMemo(() => {
-    return devices.filter((d) => d.latitude === 0 && d.longitude === 0);
-  }, [devices]);
-
-  // Only render devices with valid coordinates (not 0, 0)
-  const validDevices = useMemo(() => {
-    return devices.filter((d) => !(d.latitude === 0 && d.longitude === 0));
-  }, [devices]);
+  // Filter out zero coordinates to prevent drawing incorrect map markers/bounds
+  const validDevices = devices.filter((d) => d.latitude !== 0 || d.longitude !== 0);
+  const zeroDevices = devices.filter((d) => d.latitude === 0 && d.longitude === 0);
 
   // Default center: Aurangabad, Maharashtra
   const defaultCenter: [number, number] = [19.8762, 75.3433];
@@ -89,22 +78,18 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
           />
         ))}
 
-        <MapBoundsUpdater />
+        <MapBoundsUpdater devices={validDevices} />
       </MapContainer>
 
-      {/* Map overlay: device count & zero coordinates warnings */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2 pointer-events-none">
-        <div className="glass-card px-3 py-2 bg-surface-900/80 backdrop-blur-md">
-          <span className="text-xs text-surface-200">
-            {validDevices.length} device{validDevices.length !== 1 ? 's' : ''} on map
-          </span>
-        </div>
+      {/* Map overlay: device count */}
+      <div className="absolute top-4 right-4 z-[1000] glass-card px-3 py-2 flex flex-col gap-1.5 items-end">
+        <span className="text-xs text-surface-400">
+          {validDevices.length} device{validDevices.length !== 1 ? 's' : ''} on map
+        </span>
         {zeroDevices.map((d) => (
-          <div key={d.deviceId} className="glass-card border border-danger-500/30 bg-danger-950/80 backdrop-blur-md px-3 py-2 flex items-center gap-2 animate-pulse">
-            <span className="text-xs text-danger-400 font-semibold">
-              ⚠️ Auto {d.vehicleNumber || d.deviceId}: Lat, Long zero
-            </span>
-          </div>
+          <span key={d.deviceId} className="text-[10px] bg-danger-500/95 text-white font-semibold px-2 py-0.5 rounded animate-pulse">
+            🚨 {d.deviceId}: Lat/Long Zero (GPS Error)
+          </span>
         ))}
       </div>
     </div>

@@ -165,16 +165,21 @@ const DevicePage: React.FC = () => {
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
   const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
 
-  const isZeroCoord = latitude === 0 && longitude === 0;
+  const isGpsZero = latitude === 0 && longitude === 0;
 
   const trailPositions: [number, number][] = locationHistory
-    .filter((p) => p.latitude !== null && p.longitude !== null && !(p.latitude === 0 && p.longitude === 0))
+    .filter((p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && (p.latitude !== 0 || p.longitude !== 0))
     .map((p) => [p.latitude, p.longitude]);
 
-  const mapCenter: [number, number] =
-    latitude !== null && longitude !== null && !isZeroCoord
-      ? [latitude, longitude]
-      : [19.8762, 75.3433];
+  const mapCenter: [number, number] = (() => {
+    if (latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0) {
+      return [latitude, longitude];
+    }
+    if (trailPositions.length > 0) {
+      return trailPositions[trailPositions.length - 1];
+    }
+    return [19.8762, 75.3433];
+  })();
 
   const timeAgo = () => {
     const dateStr = device.lastSeen;
@@ -342,7 +347,7 @@ const DevicePage: React.FC = () => {
             )}
 
             {/* Current position marker */}
-            {latitude !== null && longitude !== null && !isZeroCoord && (
+            {latitude !== null && longitude !== null && !isGpsZero && (
               <Marker
                 position={[latitude, longitude]}
                 icon={icon}
@@ -406,11 +411,10 @@ const DevicePage: React.FC = () => {
             )}
           </MapContainer>
 
-          {isZeroCoord && (
-            <div className="absolute top-4 right-4 z-[1000] glass-card border border-danger-500/30 bg-danger-950/80 backdrop-blur-md px-3 py-2 animate-pulse pointer-events-none">
-              <span className="text-xs text-danger-400 font-semibold">
-                ⚠️ Auto {device.vehicleNumber || device.deviceId}: Lat, Long zero
-              </span>
+          {/* GPS Zero Indicator Overlay */}
+          {isGpsZero && (
+            <div className="absolute top-4 right-4 z-[1000] bg-danger-500/95 text-white font-semibold text-xs px-3 py-2 rounded-lg shadow-lg border border-danger-400 animate-pulse">
+              🚨 {device.deviceId}: Lat/Long Zero (GPS Error)
             </div>
           )}
         </div>
