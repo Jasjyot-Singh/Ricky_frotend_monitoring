@@ -45,6 +45,20 @@ export function useSocket(token: string | null) {
             devices.map((d) => api.getCommandHistory(d.deviceId).catch(() => []))
           );
           const manualResolved = new Set<number>();
+
+          // Merge with any localStorage persisted ones
+          const localPersisted = localStorage.getItem('ricky_manually_resolved_alerts');
+          if (localPersisted) {
+            try {
+              const parsed = JSON.parse(localPersisted);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((id) => manualResolved.add(id));
+              }
+            } catch (e) {
+              console.error('Failed to parse local manually resolved alerts:', e);
+            }
+          }
+
           for (const history of commandHistories) {
             for (const cmd of history) {
               if (cmd.command.startsWith('RESOLVE_ALERT_')) {

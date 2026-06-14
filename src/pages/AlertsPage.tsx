@@ -28,7 +28,7 @@ const AlertsPage: React.FC = () => {
   const resolveAlertInStore = useFleetStore((s) => s.resolveAlertInStore);
   const globalManuallyResolvedIds = useFleetStore((s) => s.globalManuallyResolvedIds);
   const devices = useDeviceList();
-  
+
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const isInitialLoadRef = useRef(true);
@@ -70,13 +70,13 @@ const AlertsPage: React.FC = () => {
         }
         const data = await api.getAllAlerts();
         if (!active) return;
-        // Sync resolved state from database, or check if operator manually resolved it in this session
+        // Sync resolved state from database, or check if operator manually resolved it in this session (operator manual-only resolution)
         const enriched = data.map((a) => ({
           ...a,
           latitude: a.alertLat !== undefined && a.alertLat !== null ? a.alertLat : null,
           longitude: a.alertLng !== undefined && a.alertLng !== null ? a.alertLng : null,
-          resolved: a.resolved || globalManuallyResolvedIds.has(a.id),
-          resolvedAt: a.resolved ? (a.resolvedAt || a.createdAt) : (globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null),
+          resolved: globalManuallyResolvedIds.has(a.id),
+          resolvedAt: globalManuallyResolvedIds.has(a.id) ? (a.resolvedAt || a.createdAt) : null,
         }));
         setAllAlerts(enriched);
         setError(null);
@@ -107,6 +107,18 @@ const AlertsPage: React.FC = () => {
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
+        // Send manual resolve persistence command
+        await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`).catch((e) =>
+          console.error('Failed to persist manual resolution in command logs:', e)
+        );
+
+        // For SOS alerts, automatically send the RESET_SOS command to the device
+        if (alert.type === 'SOS') {
+          await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>
+            console.error('Failed to send RESET_SOS command:', e)
+          );
+        }
+
         // Update local state to show as resolved immediately
         setAllAlerts((prev) =>
           prev.map((a) =>
@@ -212,13 +224,13 @@ const AlertsPage: React.FC = () => {
     };
 
     resolveAll();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allAlerts]);
 
   // Filter and search logic
   const processedAlerts = useMemo(() => {
     let list = [...allAlerts];
-    
+
     // 1. Filter by status (active vs resolved)
     list = list.filter((a) => {
       if (filter === 'ACTIVE') return !a.resolved;
@@ -234,7 +246,7 @@ const AlertsPage: React.FC = () => {
     // 3. Filter by search query
     if (search) {
       const query = search.toLowerCase();
-      list = list.filter((a) => 
+      list = list.filter((a) =>
         a.deviceId.toLowerCase().includes(query) ||
         a.type.toLowerCase().includes(query) ||
         a.message.toLowerCase().includes(query)
@@ -298,11 +310,10 @@ const AlertsPage: React.FC = () => {
         <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-surface-700 scrollbar-track-transparent">
           <button
             onClick={() => setSelectedDeviceId('ALL')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-              selectedDeviceId === 'ALL'
+            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${selectedDeviceId === 'ALL'
                 ? 'bg-fleet-600/30 text-fleet-400 border-fleet-500/30 shadow-md'
                 : 'bg-surface-800/40 text-surface-400 border-surface-700/30 hover:text-surface-200 hover:border-surface-600'
-            }`}
+              }`}
           >
             All Devices
           </button>
@@ -310,11 +321,10 @@ const AlertsPage: React.FC = () => {
             <button
               key={d.deviceId}
               onClick={() => setSelectedDeviceId(d.deviceId)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                selectedDeviceId === d.deviceId
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${selectedDeviceId === d.deviceId
                   ? 'bg-fleet-600/30 text-fleet-400 border-fleet-500/30 shadow-md'
                   : 'bg-surface-800/40 text-surface-400 border-surface-700/30 hover:text-surface-200 hover:border-surface-600'
-              }`}
+                }`}
             >
               {d.deviceId}
             </button>
@@ -332,11 +342,10 @@ const AlertsPage: React.FC = () => {
               <button
                 key={opt}
                 onClick={() => setFilter(opt)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all ${
-                  filter === opt
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all ${filter === opt
                     ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                     : 'text-surface-400 hover:text-surface-200'
-                }`}
+                  }`}
               >
                 {opt}
               </button>
@@ -347,21 +356,19 @@ const AlertsPage: React.FC = () => {
           <div className="flex bg-surface-900/50 p-1 rounded-xl border border-surface-800">
             <button
               onClick={() => setSortBy('newest')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                sortBy === 'newest'
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${sortBy === 'newest'
                   ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                   : 'text-surface-400 hover:text-surface-200'
-              }`}
+                }`}
             >
               Newest First
             </button>
             <button
               onClick={() => setSortBy('oldest')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                sortBy === 'oldest'
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${sortBy === 'oldest'
                   ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                   : 'text-surface-400 hover:text-surface-200'
-              }`}
+                }`}
             >
               Oldest First
             </button>
@@ -371,31 +378,28 @@ const AlertsPage: React.FC = () => {
           <div className="flex bg-surface-900/50 p-1 rounded-xl border border-surface-800 font-medium">
             <button
               onClick={() => setLayoutMode('card')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
-                layoutMode === 'card'
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${layoutMode === 'card'
                   ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                   : 'text-surface-400 hover:text-surface-200'
-              }`}
+                }`}
             >
               🗂️ Cards
             </button>
             <button
               onClick={() => setLayoutMode('table')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
-                layoutMode === 'table'
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${layoutMode === 'table'
                   ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                   : 'text-surface-400 hover:text-surface-200'
-              }`}
+                }`}
             >
               📋 Table
             </button>
             <button
               onClick={() => setLayoutMode('grouped')}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
-                layoutMode === 'grouped'
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${layoutMode === 'grouped'
                   ? 'bg-fleet-600/30 text-fleet-400 border border-fleet-500/20 shadow-md'
                   : 'text-surface-400 hover:text-surface-200'
-              }`}
+                }`}
             >
               📂 Grouped
             </button>
@@ -466,9 +470,8 @@ const AlertsPage: React.FC = () => {
                 return (
                   <tr key={alert.id} id={`alert-row-${alert.id}`} className="hover:bg-surface-800/25 transition-all">
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        severity === 'CRITICAL' ? 'bg-danger-500/10 text-danger-400' : 'bg-warning-500/10 text-warning-400'
-                      }`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${severity === 'CRITICAL' ? 'bg-danger-500/10 text-danger-400' : 'bg-warning-500/10 text-warning-400'
+                        }`}>
                         {severity}
                       </span>
                     </td>
@@ -547,9 +550,8 @@ const AlertsPage: React.FC = () => {
                         key={alert.id}
                         id={`alert-row-${alert.id}`}
                         onClick={() => toggleExpand(alert.id)}
-                        className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${
-                          severityStyles[severity] || severityStyles.INFO
-                        }`}
+                        className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${severityStyles[severity] || severityStyles.INFO
+                          }`}
                       >
                         {/* Header Line */}
                         <div className="flex items-center justify-between gap-4">
@@ -587,7 +589,7 @@ const AlertsPage: React.FC = () => {
 
                         {/* Expanded Section */}
                         {isExpanded && (
-                          <div 
+                          <div
                             className="mt-4 pt-4 border-t border-surface-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-slide-down"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -670,9 +672,8 @@ const AlertsPage: React.FC = () => {
                 key={alert.id}
                 id={`alert-row-${alert.id}`}
                 onClick={() => toggleExpand(alert.id)}
-                className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${
-                  severityStyles[severity] || severityStyles.INFO
-                }`}
+                className={`border-l-4 rounded-xl px-5 py-4 transition-all cursor-pointer hover:bg-surface-800/20 border border-surface-700/20 ${severityStyles[severity] || severityStyles.INFO
+                  }`}
               >
                 {/* Header Line */}
                 <div className="flex items-center justify-between gap-4">
@@ -714,7 +715,7 @@ const AlertsPage: React.FC = () => {
 
                 {/* Expanded Section */}
                 {isExpanded && (
-                  <div 
+                  <div
                     className="mt-4 pt-4 border-t border-surface-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-slide-down"
                     onClick={(e) => e.stopPropagation()} // Prevent collapse when clicking details
                   >

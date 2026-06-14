@@ -20,6 +20,18 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
 
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
+        // Send manual resolve persistence command
+        await api.sendCommand(alert.deviceId, `RESOLVE_ALERT_${alertId}`).catch((e) =>
+          console.error('Failed to persist manual resolution in command logs:', e)
+        );
+
+        // For SOS alerts, automatically send the RESET_SOS command to the device
+        if (alert.type === 'SOS') {
+          await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>
+            console.error('Failed to send RESET_SOS command:', e)
+          );
+        }
+
         // Mark resolved in store (keeps it visible as resolved) instead of removing
         resolveAlertInStore(alertId, res.resolvedAt);
       }
@@ -28,9 +40,9 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ maxAlerts = 15 }) => {
     }
   }, [alerts, resolveAlertInStore]);
 
-  // Count all unresolved alerts in store
+  // Count all unresolved alerts in store (operator manual-only resolution)
   const unresolvedCount = allAlerts.filter(
-    (a) => !a.resolved && !globalManuallyResolvedIds.has(a.id)
+    (a) => !globalManuallyResolvedIds.has(a.id)
   ).length;
 
   return (
