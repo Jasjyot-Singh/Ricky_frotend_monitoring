@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDeviceList } from '../store/useFleetStore';
 import { api } from '../lib/api';
 import type { LocationPoint } from '../types/fleet.types';
@@ -192,7 +192,25 @@ export function calculateAdImpressions(
 
 const ImpressionCalculatorPage: React.FC = () => {
   const devices = useDeviceList();
-  const [playlist, setPlaylist] = useState<string[]>(DEFAULT_PLAYLIST);
+  const [playlist, setPlaylist] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ricky_ad_playlist');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        // Fallback on parse error
+      }
+    }
+    return DEFAULT_PLAYLIST;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ricky_ad_playlist', JSON.stringify(playlist));
+  }, [playlist]);
+
   const [newAdName, setNewAdName] = useState('');
   
   const [selectedDevice, setSelectedDevice] = useState(devices[0]?.deviceId || '');
