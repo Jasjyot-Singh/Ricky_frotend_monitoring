@@ -361,13 +361,6 @@ const DevicePage: React.FC = () => {
       {/* Device Info Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="glass-card p-4 text-center">
-          <p className="text-xs text-surface-500 uppercase tracking-wider">Speed</p>
-          <p className="text-2xl font-bold text-white mt-1">
-            {speed?.toFixed(1) ?? '—'}
-            <span className="text-sm text-surface-400 ml-1">km/h</span>
-          </p>
-        </div>
-        <div className="glass-card p-4 text-center">
           <p className="text-xs text-surface-500 uppercase tracking-wider">Battery</p>
           <div className="flex items-center justify-center gap-2 mt-1">
             <p className={`text-2xl font-bold ${(batteryPct ?? 0) > 50
