@@ -106,10 +106,10 @@ const AlertsPage: React.FC = () => {
       setResolvingId(alertId);
       const res = await api.resolveAlert(alertId);
       if (res.resolved) {
-        // For SOS alerts, automatically send the RESET_SOS command to the device
+        // For SOS alerts, automatically send the $SOSOFF# command to the device
         if (alert.type === 'SOS') {
-          await api.sendCommand(alert.deviceId, 'RESET_SOS').catch((e) =>
-            console.error('Failed to send RESET_SOS command:', e)
+          await api.sendCommand(alert.deviceId, '$SOSOFF#').catch((e) =>
+            console.error('Failed to send $SOSOFF# command:', e)
           );
         }
 
