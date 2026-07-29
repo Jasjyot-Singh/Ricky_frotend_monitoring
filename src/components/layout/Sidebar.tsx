@@ -38,22 +38,18 @@ const Sidebar: React.FC = () => {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-surface-900/80 backdrop-blur-xl border-r border-surface-700/50 flex flex-col z-40">
       {/* Logo */}
-      <div className="p-5 border-b border-surface-700/50">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3">
+      <div className="p-6 border-b border-surface-700/50">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-surface-950 border border-surface-700/70 p-1 flex items-center justify-center shadow-lg shadow-black/40 overflow-hidden shrink-0">
             <img
               src="/official_ricky_logo.png"
               alt="Ricky Logo"
-              className="h-10 w-auto object-contain filter drop-shadow-md"
+              className="w-full h-full object-contain filter drop-shadow"
             />
-            <div className="flex flex-col">
-              <span className="text-xl font-extrabold text-white tracking-tight leading-none">
-                Ricky<span className="text-xs font-semibold align-top text-surface-400 ml-0.5">TM</span>
-              </span>
-              <span className="text-[10px] font-semibold text-fleet-400 tracking-wider uppercase mt-1">
-                Fleet Monitoring
-              </span>
-            </div>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white tracking-tight">Ricky Fleet</h1>
+            <p className="text-xs text-surface-400">Monitoring System</p>
           </div>
         </div>
       </div>
