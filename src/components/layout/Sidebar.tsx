@@ -40,8 +40,12 @@ const Sidebar: React.FC = () => {
       {/* Logo */}
       <div className="p-6 border-b border-surface-700/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fleet-500 to-fleet-700 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-fleet-500/25">
-            R
+          <div className="w-10 h-10 rounded-xl bg-surface-950 border border-surface-700/60 p-1.5 flex items-center justify-center shadow-lg shadow-black/30 overflow-hidden group">
+            <img
+              src="/official_ricky_logo.png"
+              alt="Ricky Official Logo"
+              className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+            />
           </div>
           <div>
             <h1 className="text-lg font-bold text-white tracking-tight">Ricky Fleet</h1>
