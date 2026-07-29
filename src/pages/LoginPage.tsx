@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { setTokens } from '../lib/auth';
+import rickyLogo from '../assets/official_ricky_logo.png';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,17 +37,19 @@ const LoginPage: React.FC = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <img
-              src="/official_ricky_logo.png"
-              alt="Ricky Logo"
-              className="h-14 w-auto object-contain filter drop-shadow-lg"
-            />
+            <div className="w-14 h-14 rounded-2xl bg-surface-950 border border-surface-700/80 p-2 flex items-center justify-center shadow-xl">
+              <img
+                src={rickyLogo}
+                alt="Ricky Logo"
+                className="w-full h-full object-contain filter drop-shadow"
+              />
+            </div>
             <div className="text-left">
               <span className="text-3xl font-extrabold text-white tracking-tight leading-none block">
                 Ricky<span className="text-sm font-semibold align-top text-surface-400 ml-0.5">TM</span>
               </span>
               <span className="text-xs font-semibold text-fleet-400 tracking-wider uppercase mt-1 block">
-                Fleet Monitoring
+                Fleet Monitoring System
               </span>
             </div>
           </div>
