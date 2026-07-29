@@ -76,8 +76,8 @@ const Sidebar: React.FC = () => {
           <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Fleet Status</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">
-              <p className="text-2xl font-bold text-fleet-400">{stats.online}</p>
-              <p className="text-xs text-surface-500">Online</p>
+              <p className="text-2xl font-bold text-fleet-400">{stats.healthy}</p>
+              <p className="text-xs text-surface-500">Healthy</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-surface-500">{stats.offline}</p>
@@ -88,8 +88,8 @@ const Sidebar: React.FC = () => {
               <p className="text-xs text-surface-500">SOS</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-warning-400">{stats.lowBattery}</p>
-              <p className="text-xs text-surface-500">Low Batt</p>
+              <p className="text-2xl font-bold text-warning-400">{stats.warning}</p>
+              <p className="text-xs text-surface-500">Warning</p>
             </div>
           </div>
         </div>
