@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useFleetStats } from '../../store/useFleetStore';
+import rickyLogo from '../../assets/official_ricky_logo.png';
 
 const navItems = [
   {
@@ -38,14 +39,20 @@ const Sidebar: React.FC = () => {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-surface-900/80 backdrop-blur-xl border-r border-surface-700/50 flex flex-col z-40">
       {/* Logo */}
-      <div className="p-6 border-b border-surface-700/50">
+      <div className="p-5 border-b border-surface-700/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fleet-500 to-fleet-700 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-fleet-500/25">
-            R
+          <div className="w-12 h-12 rounded-xl bg-surface-950 border border-surface-700/80 p-1.5 flex items-center justify-center shadow-lg shadow-black/40 overflow-hidden shrink-0">
+            <img
+              src={rickyLogo}
+              alt="Ricky Logo"
+              className="w-full h-full object-contain filter drop-shadow"
+            />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">Ricky Fleet</h1>
-            <p className="text-xs text-surface-400">Monitoring System</p>
+            <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-0.5">
+              Ricky<span className="text-xs font-semibold align-top text-surface-400">TM</span>
+            </h1>
+            <p className="text-xs font-semibold text-fleet-400 mt-0.5">Monitoring System</p>
           </div>
         </div>
       </div>
@@ -76,8 +83,8 @@ const Sidebar: React.FC = () => {
           <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Fleet Status</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">
-              <p className="text-2xl font-bold text-fleet-400">{stats.online}</p>
-              <p className="text-xs text-surface-500">Online</p>
+              <p className="text-2xl font-bold text-fleet-400">{stats.healthy}</p>
+              <p className="text-xs text-surface-500">Healthy</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-surface-500">{stats.offline}</p>
@@ -88,8 +95,8 @@ const Sidebar: React.FC = () => {
               <p className="text-xs text-surface-500">SOS</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-warning-400">{stats.lowBattery}</p>
-              <p className="text-xs text-surface-500">Low Batt</p>
+              <p className="text-2xl font-bold text-warning-400">{stats.warning}</p>
+              <p className="text-xs text-surface-500">Warning</p>
             </div>
           </div>
         </div>

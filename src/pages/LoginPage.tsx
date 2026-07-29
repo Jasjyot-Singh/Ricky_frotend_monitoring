@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { setTokens } from '../lib/auth';
+import rickyLogo from '../assets/official_ricky_logo.png';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -35,11 +36,23 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-fleet-500 to-fleet-700 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-fleet-500/25 mx-auto mb-4">
-            R
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-14 h-14 rounded-2xl bg-surface-950 border border-surface-700/80 p-2 flex items-center justify-center shadow-xl">
+              <img
+                src={rickyLogo}
+                alt="Ricky Logo"
+                className="w-full h-full object-contain filter drop-shadow"
+              />
+            </div>
+            <div className="text-left">
+              <span className="text-3xl font-extrabold text-white tracking-tight leading-none block">
+                Ricky<span className="text-sm font-semibold align-top text-surface-400 ml-0.5">TM</span>
+              </span>
+              <span className="text-xs font-semibold text-fleet-400 tracking-wider uppercase mt-1 block">
+                Fleet Monitoring System
+              </span>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Ricky Fleet</h1>
-          <p className="text-surface-400 mt-1">Monitoring Dashboard</p>
         </div>
 
         {/* Login Card */}

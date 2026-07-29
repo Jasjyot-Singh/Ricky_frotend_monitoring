@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/shallow';
 import type { DeviceStatus, Alert, FleetStatsResponse } from '../types/fleet.types';
-import { getAlertSeverity } from '../types/fleet.types';
+import { getAlertSeverity, getMarkerState } from '../types/fleet.types';
 
 const MAX_ALERTS = 100;
 const CLOCK_OFFSET_KEY = 'ricky_clock_offset';
@@ -289,52 +289,64 @@ export const useMapDevices = () =>
     ),
   );
 
-/** Returns fleet summary stats — prefers REST stats, falls back to computed */
+/** Returns fleet summary stats — computed based on device marker states and active alerts */
 export const useFleetStats = () =>
   useFleetStore(
     useShallow((s) => {
       const devices = Object.values(s.devices);
-      
+
+      let healthy = 0;
       let online = 0;
       let offline = 0;
       let sosActive = 0;
+      let warning = 0;
       let lowBattery = 0;
 
-      // Extract set of device IDs with active (unresolved) SOS or LOW_BATTERY alerts
+      // Extract set of device IDs with active (unresolved) SOS or WARNING alerts
       const activeSOSDevices = new Set(
         s.alerts
           .filter((a) => a.type === 'SOS' && !a.resolved)
           .map((a) => a.deviceId)
       );
-      const activeBatteryDevices = new Set(
+      const activeWarningDevices = new Set(
         s.alerts
-          .filter((a) => a.type === 'LOW_BATTERY' && !a.resolved)
+          .filter(
+            (a) =>
+              !a.resolved &&
+              (a.type === 'LOW_BATTERY' ||
+                a.type === 'GPS_FAILURE' ||
+                a.type === 'INTERNET_FAILURE' ||
+                a.type === 'ESP_DISCONNECTED' ||
+                a.type === 'DISPLAY_FAILURE' ||
+                a.type === 'POSTER_SERVICE_DOWN' ||
+                a.type === 'TELEMETRY_SERVICE_DOWN')
+          )
           .map((a) => a.deviceId)
       );
 
-      const adjustedNow = Date.now() + s.serverClockOffset;
       for (const d of devices) {
-        // Determine offline using 5-minute threshold directly (no Date.now in selector above)
-        let lastSeenTime = d.lastTelemetryTime ?? 0;
-        if (!lastSeenTime && d.lastSeen) {
-          lastSeenTime = new Date(d.lastSeen).getTime();
-          if (typeof d.lastSeen === 'string' && !d.lastSeen.endsWith('Z') && !d.lastSeen.includes('+')) {
-            lastSeenTime = new Date(d.lastSeen.replace(' ', 'T') + 'Z').getTime();
-          }
-        }
-        const timeSince = lastSeenTime > 0 ? (adjustedNow - lastSeenTime) : Infinity;
-        const isRecent5Min = timeSince <= 300000;
-        const isOnline = d.online && isRecent5Min;
-        if (!isOnline) {
-          offline++;
-        } else {
-          online++;
+        const state = getMarkerState(d, s.serverClockOffset, activeSOSDevices, activeWarningDevices);
+
+        switch (state) {
+          case 'healthy':
+            healthy++;
+            online++;
+            break;
+          case 'warning':
+            warning++;
+            online++;
+            break;
+          case 'sos':
+            sosActive++;
+            online++;
+            break;
+          case 'offline':
+          default:
+            offline++;
+            break;
         }
 
-        if (activeSOSDevices.has(d.deviceId)) {
-          sosActive++;
-        }
-        if (activeBatteryDevices.has(d.deviceId)) {
+        if (d.batteryPercentage !== null && d.batteryPercentage < 20) {
           lowBattery++;
         }
       }
@@ -342,8 +354,10 @@ export const useFleetStats = () =>
       return {
         total: devices.length,
         online,
+        healthy,
         offline,
         sosActive,
+        warning,
         lowBattery,
       };
     }),
