@@ -111,9 +111,13 @@ const DevicePage: React.FC = () => {
   const filteredHistory = useMemo(() => {
     return locationHistory.filter((p) => {
       if (!p) return false;
-      const lat = parseFloat(p.latitude as any);
-      const lng = parseFloat(p.longitude as any);
-      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+      const lat = typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude as any);
+      const lng = typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude as any);
+      if (isNaN(lat) || isNaN(lng)) return false;
+      if (lat === 0 || lng === 0) return false;
+      if (Math.abs(lat) < 0.001 || Math.abs(lng) < 0.001) return false;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+      return true;
     });
   }, [locationHistory]);
   const [sendingCommand, setSendingCommand] = useState(false);
@@ -244,27 +248,42 @@ const DevicePage: React.FC = () => {
 
   const isGpsZero = (() => {
     if (latitude === null || longitude === null || latitude === undefined || longitude === undefined) return true;
-    const latVal = parseFloat(latitude as any);
-    const lngVal = parseFloat(longitude as any);
-    return isNaN(latVal) || isNaN(lngVal) || latVal === 0 || lngVal === 0;
+    const latVal = typeof latitude === 'number' ? latitude : parseFloat(latitude as any);
+    const lngVal = typeof longitude === 'number' ? longitude : parseFloat(longitude as any);
+    return isNaN(latVal) || isNaN(lngVal) || latVal === 0 || lngVal === 0 || Math.abs(latVal) < 0.001 || Math.abs(lngVal) < 0.001;
   })();
 
-  const trailPositions: [number, number][] = filteredHistory.map((p) => [p.latitude, p.longitude]);
+  const trailPositions: [number, number][] = useMemo(() => {
+    return filteredHistory.map((p) => [
+      typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude as any),
+      typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude as any),
+    ]);
+  }, [filteredHistory]);
 
   const replayPoint = filteredHistory[replayIndex] || null;
-  const replayMarkerPosition: [number, number] | null = replayPoint && replayPoint.latitude && replayPoint.longitude
-    ? [replayPoint.latitude, replayPoint.longitude]
-    : null;
+  const replayMarkerPosition: [number, number] | null = useMemo(() => {
+    if (!replayPoint) return null;
+    const lat = typeof replayPoint.latitude === 'number' ? replayPoint.latitude : parseFloat(replayPoint.latitude as any);
+    const lng = typeof replayPoint.longitude === 'number' ? replayPoint.longitude : parseFloat(replayPoint.longitude as any);
+    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0 || Math.abs(lat) < 0.001 || Math.abs(lng) < 0.001) {
+      return null;
+    }
+    return [lat, lng];
+  }, [replayPoint]);
 
-  const mapCenter: [number, number] = (() => {
+  const mapCenter: [number, number] = useMemo(() => {
     if (!isGpsZero && latitude !== null && longitude !== null) {
-      return [parseFloat(latitude as any), parseFloat(longitude as any)];
+      const latVal = typeof latitude === 'number' ? latitude : parseFloat(latitude as any);
+      const lngVal = typeof longitude === 'number' ? longitude : parseFloat(longitude as any);
+      if (!isNaN(latVal) && !isNaN(lngVal)) {
+        return [latVal, lngVal];
+      }
     }
     if (trailPositions.length > 0) {
       return trailPositions[trailPositions.length - 1];
     }
     return [19.8762, 75.3433];
-  })();
+  }, [isGpsZero, latitude, longitude, trailPositions]);
 
   const timeAgo = () => {
     const dateStr = device.lastSeen;

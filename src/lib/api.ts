@@ -127,12 +127,23 @@ export const api = {
   getDevice: (deviceId: string) =>
     apiFetch<DeviceDetailResponse>(`/api/v1/devices/${deviceId}`),
 
-  /** Fetch route history for a device */
-  getRouteHistory: (deviceId: string, fromDate: string, toDate: string) => {
+  /** Fetch route history for a device (filters out 0,0 glitch points) */
+  getRouteHistory: async (deviceId: string, fromDate: string, toDate: string) => {
     const params = new URLSearchParams({ fromDate, toDate });
-    return apiFetch<LocationPoint[]>(
+    const points = await apiFetch<LocationPoint[]>(
       `/api/v1/devices/${deviceId}/routes?${params}`,
     );
+    if (!Array.isArray(points)) return [];
+    return points.filter((p) => {
+      if (!p) return false;
+      const lat = typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude as any);
+      const lng = typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude as any);
+      if (isNaN(lat) || isNaN(lng)) return false;
+      if (lat === 0 || lng === 0) return false;
+      if (Math.abs(lat) < 0.001 || Math.abs(lng) < 0.001) return false;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+      return true;
+    });
   },
 
   /** Fetch SOS event history for a device */
