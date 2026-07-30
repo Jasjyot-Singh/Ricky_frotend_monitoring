@@ -96,7 +96,7 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
         },
       }}
     >
-      <Popup>
+      <Popup className="custom-dark-popup">
         <div className="min-w-[230px] space-y-3 py-1">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-surface-800 pb-2">
