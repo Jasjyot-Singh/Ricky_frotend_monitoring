@@ -96,13 +96,13 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
         },
       }}
     >
-      <Popup>
-        <div className="min-w-[220px] space-y-3 py-1">
+      <Popup className="custom-dark-popup">
+        <div className="min-w-[230px] space-y-3 py-1">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between border-b border-surface-800 pb-2">
             <div>
-              <p className="font-bold text-white text-sm">{device.deviceId}</p>
-              <p className="text-xs text-surface-400">{device.vehicleNumber}</p>
+              <p className="font-bold text-white text-sm">{device.vehicleNumber || device.deviceId}</p>
+              <p className="text-[11px] text-surface-400 font-mono">{device.deviceId}</p>
             </div>
             <span
               className={`badge ${
@@ -119,46 +119,54 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
             </span>
           </div>
 
-          {/* Stats */}
+          {/* All 4 Stats */}
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-surface-500">Speed</span>
-              <p className="text-white font-medium">{device.speed != null ? `${device.speed.toFixed(1)} km/h` : '— km/h'}</p>
+            <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+              <span className="text-surface-400 text-[10px] uppercase font-medium block">Speed</span>
+              <p className="text-white font-semibold font-mono mt-0.5">
+                {device.speed != null ? `${device.speed.toFixed(1)} km/h` : '0.0 km/h'}
+              </p>
             </div>
-            <div>
-              <span className="text-surface-500">Battery</span>
+            <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+              <span className="text-surface-400 text-[10px] uppercase font-medium block">Battery</span>
               <p
-                className="font-medium"
+                className="font-semibold font-mono mt-0.5"
                 style={{
-                  color: device.batteryPercentage == null
-                    ? '#94a3b8'
-                    : device.batteryPercentage > 50
-                    ? '#22c55e'
-                    : device.batteryPercentage > 20
-                    ? '#f59e0b'
-                    : '#ef4444',
+                  color:
+                    device.batteryPercentage == null
+                      ? '#94a3b8'
+                      : device.batteryPercentage > 50
+                      ? '#22c55e'
+                      : device.batteryPercentage > 20
+                      ? '#f59e0b'
+                      : '#ef4444',
                 }}
               >
                 {device.batteryPercentage != null ? `${device.batteryPercentage}%` : '—'}
                 {device.charging && ' ⚡'}
               </p>
             </div>
-            <div>
-              <span className="text-surface-500">Driver</span>
-              <p className="text-white font-medium">{device.driverName || '—'}</p>
+            <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+              <span className="text-surface-400 text-[10px] uppercase font-medium block">Driver</span>
+              <p className="text-white font-semibold truncate mt-0.5">
+                {device.driverName || 'Unassigned'}
+              </p>
             </div>
-            <div>
-              <span className="text-surface-500">Last Seen</span>
-              <p className="text-white font-medium">{timeSinceLastSeen()}</p>
+            <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+              <span className="text-surface-400 text-[10px] uppercase font-medium block">Last Seen</span>
+              <p className="text-white font-semibold font-mono mt-0.5">
+                {timeSinceLastSeen()}
+              </p>
             </div>
           </div>
 
           {/* Action */}
           <button
             onClick={() => navigate(`/device/${device.deviceId}`)}
-            className="w-full btn btn--primary text-xs py-2"
+            className="w-full btn btn--primary text-xs py-2 mt-1 flex items-center justify-center gap-1.5"
           >
-            View Details →
+            <span>View Details</span>
+            <span>→</span>
           </button>
         </div>
       </Popup>
