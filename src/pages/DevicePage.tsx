@@ -484,12 +484,12 @@ const DevicePage: React.FC = () => {
                 }}
               >
                 <Popup>
-                  <div className="min-w-[220px] space-y-3 py-1">
+                  <div className="min-w-[230px] space-y-3 py-1">
                     {/* Header */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between border-b border-surface-800 pb-2">
                       <div>
-                        <p className="font-bold text-white text-sm">{device.deviceId}</p>
-                        <p className="text-xs text-surface-400">{device.vehicleNumber}</p>
+                        <p className="font-bold text-white text-sm">{device.vehicleNumber || device.deviceId}</p>
+                        <p className="text-[11px] text-surface-400 font-mono">{device.deviceId}</p>
                       </div>
                       <span
                         className={`badge ${
@@ -506,26 +506,26 @@ const DevicePage: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Stats */}
+                    {/* All 4 Stats */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-surface-500">Speed</span>
-                        <p className="text-white font-medium">{speed?.toFixed(1) ?? '—'} km/h</p>
+                      <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+                        <span className="text-surface-400 text-[10px] uppercase font-medium block">Speed</span>
+                        <p className="text-white font-semibold font-mono mt-0.5">{speed?.toFixed(1) ?? '0.0'} km/h</p>
                       </div>
-                      <div>
-                        <span className="text-surface-500">Battery</span>
-                        <p className="text-white font-medium">
+                      <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+                        <span className="text-surface-400 text-[10px] uppercase font-medium block">Battery</span>
+                        <p className="text-white font-semibold font-mono mt-0.5">
                           {batteryPct ?? '—'}%
                           {device.charging && ' ⚡'}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-surface-500">Driver</span>
-                        <p className="text-white font-medium">{device.driverName || '—'}</p>
+                      <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+                        <span className="text-surface-400 text-[10px] uppercase font-medium block">Driver</span>
+                        <p className="text-white font-semibold truncate mt-0.5">{device.driverName || 'Unassigned'}</p>
                       </div>
-                      <div>
-                        <span className="text-surface-500">Last Seen</span>
-                        <p className="text-white font-medium">{timeAgo()}</p>
+                      <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
+                        <span className="text-surface-400 text-[10px] uppercase font-medium block">Last Seen</span>
+                        <p className="text-white font-semibold font-mono mt-0.5">{timeAgo()}</p>
                       </div>
                     </div>
                   </div>
