@@ -75,9 +75,7 @@ const ReplayMapPanController: React.FC<{ position: [number, number] | null; isPl
 
 const AVAILABLE_COMMANDS: { value: CommandType; label: string; icon: string }[] = [
   { value: '$SOSOFF#', label: 'Close SOS', icon: '🟢' },
-  { value: 'REBOOT_DEVICE', label: 'Reboot Device', icon: '⚡' },
   { value: 'RESTART_PI', label: 'Restart Pi', icon: '🔄' },
-  { value: 'FORCE_GPS_PING', label: 'Force GPS Ping', icon: '🛰' },
 ];
 
 const DevicePage: React.FC = () => {
@@ -733,8 +731,10 @@ const DevicePage: React.FC = () => {
           <p className="text-xs text-surface-500 mb-4">
             Send remote commands to <span className="text-fleet-400 font-mono">{device.deviceId}</span>
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {AVAILABLE_COMMANDS.map((cmd) => (
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            {AVAILABLE_COMMANDS.filter(
+              (cmd) => cmd.value !== 'REBOOT_DEVICE' && cmd.value !== 'FORCE_GPS_PING'
+            ).map((cmd) => (
               <button
                 key={cmd.value}
                 onClick={() => handleSendCommand(cmd.value)}
@@ -767,7 +767,7 @@ const DevicePage: React.FC = () => {
               <input
                 type="text"
                 name="customCommand"
-                placeholder="Enter custom command (e.g. $SOSOFF#, START_SOS, REBOOT_DEVICE)"
+                placeholder="Enter custom command (e.g. $SOSOFF#, START_SOS, RESTART_PI)"
                 className="flex-1 px-3 py-1.5 text-xs bg-surface-900 border border-surface-700 rounded-lg text-white placeholder-surface-500 focus:outline-none focus:border-fleet-400 focus:ring-1 focus:ring-fleet-400/25"
                 disabled={sendingCommand}
               />
