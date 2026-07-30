@@ -731,8 +731,10 @@ const DevicePage: React.FC = () => {
           <p className="text-xs text-surface-500 mb-4">
             Send remote commands to <span className="text-fleet-400 font-mono">{device.deviceId}</span>
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {AVAILABLE_COMMANDS.map((cmd) => (
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            {AVAILABLE_COMMANDS.filter(
+              (cmd) => cmd.value !== 'REBOOT_DEVICE' && cmd.value !== 'FORCE_GPS_PING'
+            ).map((cmd) => (
               <button
                 key={cmd.value}
                 onClick={() => handleSendCommand(cmd.value)}
