@@ -56,10 +56,8 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
   // Default center: Aurangabad, Maharashtra
   const defaultCenter: [number, number] = [19.8762, 75.3433];
 
-  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
-  const cartoTileUrl = cartoApiKey
-    ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
-    : `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`;
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2d7i_1_293ed9b7d0fb0ffe74a34e7a';
+  const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl ${className}`}>
