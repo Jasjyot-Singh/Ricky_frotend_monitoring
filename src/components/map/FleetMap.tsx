@@ -56,6 +56,11 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
   // Default center: Aurangabad, Maharashtra
   const defaultCenter: [number, number] = [19.8762, 75.3433];
 
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
+  const cartoTileUrl = cartoApiKey
+    ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
+    : `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`;
+
   return (
     <div className={`relative overflow-hidden rounded-2xl ${className}`}>
       <MapContainer
@@ -67,7 +72,7 @@ const FleetMap: React.FC<FleetMapProps> = ({ className = '', onDeviceClick }) =>
       >
         <TileLayer
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={cartoTileUrl}
         />
 
         {validDevices.map((device) => (
