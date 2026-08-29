@@ -241,6 +241,9 @@ const DevicePage: React.FC = () => {
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2d7i_1_293ed9b7d0fb0ffe74a34e7a';
+  const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`;
+
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
   const longitude = deviceDetail?.liveStatus.longitude ?? device.longitude;
 
@@ -346,24 +349,22 @@ const DevicePage: React.FC = () => {
           <p className="text-xs text-surface-500">Telemetry Pulse</p>
           {secondsSinceLastSeen !== null ? (
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-2 h-2 rounded-full ${
-                secondsSinceLastSeen <= 7 
-                  ? 'bg-fleet-400 shadow-[0_0_8px_#10b981]' 
-                  : secondsSinceLastSeen <= 15 
-                    ? 'bg-warning-400 animate-pulse' 
-                    : 'bg-danger-400 animate-pulse'
-              }`} />
-              <p className={`text-sm font-semibold font-mono ${
-                secondsSinceLastSeen <= 7 
-                  ? 'text-fleet-400' 
-                  : secondsSinceLastSeen <= 15 
-                    ? 'text-warning-400' 
-                    : 'text-danger-400'
-              }`}>
-                {secondsSinceLastSeen <= 7 
-                  ? `Active (${secondsSinceLastSeen}s ago)` 
-                  : secondsSinceLastSeen <= 60 
-                    ? `Delayed (${secondsSinceLastSeen}s ago)` 
+              <span className={`w-2 h-2 rounded-full ${secondsSinceLastSeen <= 7
+                ? 'bg-fleet-400 shadow-[0_0_8px_#10b981]'
+                : secondsSinceLastSeen <= 15
+                  ? 'bg-warning-400 animate-pulse'
+                  : 'bg-danger-400 animate-pulse'
+                }`} />
+              <p className={`text-sm font-semibold font-mono ${secondsSinceLastSeen <= 7
+                ? 'text-fleet-400'
+                : secondsSinceLastSeen <= 15
+                  ? 'text-warning-400'
+                  : 'text-danger-400'
+                }`}>
+                {secondsSinceLastSeen <= 7
+                  ? `Active (${secondsSinceLastSeen}s ago)`
+                  : secondsSinceLastSeen <= 60
+                    ? `Delayed (${secondsSinceLastSeen}s ago)`
                     : `${Math.floor(secondsSinceLastSeen / 60)}m ago`
                 }
               </p>
@@ -381,10 +382,10 @@ const DevicePage: React.FC = () => {
           <p className="text-xs text-surface-500 uppercase tracking-wider">Battery</p>
           <div className="flex items-center justify-center gap-2 mt-1">
             <p className={`text-2xl font-bold ${(batteryPct ?? 0) > 50
-                ? 'text-fleet-400'
-                : (batteryPct ?? 0) > 20
-                  ? 'text-warning-400'
-                  : 'text-danger-400'
+              ? 'text-fleet-400'
+              : (batteryPct ?? 0) > 20
+                ? 'text-warning-400'
+                : 'text-danger-400'
               }`}>
               {batteryPct ?? '—'}%
             </p>
@@ -442,7 +443,7 @@ const DevicePage: React.FC = () => {
           >
             <TileLayer
               attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              url={cartoTileUrl}
             />
 
             {/* Location history trail */}
@@ -492,15 +493,14 @@ const DevicePage: React.FC = () => {
                         <p className="text-[11px] text-surface-400 font-mono">{device.deviceId}</p>
                       </div>
                       <span
-                        className={`badge ${
-                          state === 'healthy'
-                            ? 'badge--success'
-                            : state === 'warning'
+                        className={`badge ${state === 'healthy'
+                          ? 'badge--success'
+                          : state === 'warning'
                             ? 'badge--warning'
                             : state === 'sos'
-                            ? 'badge--danger'
-                            : 'badge--neutral'
-                        }`}
+                              ? 'badge--danger'
+                              : 'badge--neutral'
+                          }`}
                       >
                         {state.toUpperCase()}
                       </span>
@@ -557,16 +557,15 @@ const DevicePage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setIsReplaying(!isReplaying)}
-                    className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${
-                      isReplaying 
-                        ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25' 
-                        : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
-                    }`}
+                    className={`btn flex items-center justify-center w-10 h-10 rounded-full text-lg transition-all ${isReplaying
+                      ? 'bg-warning-500 hover:bg-warning-600 text-black shadow-lg shadow-warning-500/25'
+                      : 'bg-fleet-500 hover:bg-fleet-600 text-white shadow-lg shadow-fleet-500/25'
+                      }`}
                     title={isReplaying ? 'Pause Replay' : 'Play Replay'}
                   >
                     {isReplaying ? '⏸' : '▶'}
                   </button>
-                  
+
                   <button
                     onClick={() => {
                       setIsReplaying(false);
@@ -584,11 +583,10 @@ const DevicePage: React.FC = () => {
                       <button
                         key={speedVal}
                         onClick={() => setReplaySpeed(speedVal)}
-                        className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${
-                          replaySpeed === speedVal
-                            ? 'bg-fleet-500 text-white'
-                            : 'text-surface-400 hover:text-surface-200'
-                        }`}
+                        className={`px-2 py-1 text-xs font-semibold rounded-md transition-all ${replaySpeed === speedVal
+                          ? 'bg-fleet-500 text-white'
+                          : 'text-surface-400 hover:text-surface-200'
+                          }`}
                       >
                         {speedVal}x
                       </button>
@@ -752,7 +750,7 @@ const DevicePage: React.FC = () => {
             <h4 className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider mb-2">
               Send Custom Instruction
             </h4>
-            <form 
+            <form
               onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
@@ -809,13 +807,12 @@ const DevicePage: React.FC = () => {
                       <tr key={cmd.id} className="hover:bg-surface-800/20">
                         <td className="py-2.5 font-mono text-[11px] text-white">{cmd.command}</td>
                         <td className="py-2.5">
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
-                            cmd.status === 'executed'
-                              ? 'bg-fleet-500/15 text-fleet-400'
-                              : cmd.status === 'failed'
-                                ? 'bg-danger-500/15 text-danger-400'
-                                : 'bg-warning-500/15 text-warning-400'
-                          }`}>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${cmd.status === 'executed'
+                            ? 'bg-fleet-500/15 text-fleet-400'
+                            : cmd.status === 'failed'
+                              ? 'bg-danger-500/15 text-danger-400'
+                              : 'bg-warning-500/15 text-warning-400'
+                            }`}>
                             {cmd.status}
                           </span>
                         </td>
@@ -823,8 +820,8 @@ const DevicePage: React.FC = () => {
                           {new Date(cmd.createdAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td className="py-2.5 text-surface-400 font-mono text-[11px]">
-                          {cmd.executedAt 
-                            ? new Date(cmd.executedAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                          {cmd.executedAt
+                            ? new Date(cmd.executedAt).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                             : '—'}
                         </td>
                         <td className="py-2.5 max-w-[200px] truncate text-[11px] text-surface-400" title={cmd.response || ''}>
