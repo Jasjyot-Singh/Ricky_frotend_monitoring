@@ -1,26 +1,35 @@
-// ─── JWT Token Management ────────────────────────────────────────────────────
+// ─── JWT Token Management (In-Memory Module Store) ────────────────────────────
 
-const ACCESS_TOKEN_KEY = 'ricky_access_token';
-const REFRESH_TOKEN_KEY = 'ricky_refresh_token';
+// Private module-scoped variables (NOT accessible to window.localStorage)
+let inMemoryAccessToken: string | null = null;
+let inMemoryRefreshToken: string | null = null;
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return inMemoryAccessToken;
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return inMemoryRefreshToken;
 }
 
-export function setTokens(accessToken: string, refreshToken: string): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+export function setTokens(accessToken: string, refreshToken?: string): void {
+  inMemoryAccessToken = accessToken;
+  if (refreshToken) {
+    inMemoryRefreshToken = refreshToken;
+  }
+  // Proactively purge old legacy tokens from localStorage for security
+  localStorage.removeItem('ricky_access_token');
+  localStorage.removeItem('ricky_refresh_token');
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  inMemoryAccessToken = null;
+  inMemoryRefreshToken = null;
+  localStorage.removeItem('ricky_access_token');
+  localStorage.removeItem('ricky_refresh_token');
 }
 
 export function isAuthenticated(): boolean {
-  return !!getAccessToken();
+  return !!inMemoryAccessToken;
 }
+
