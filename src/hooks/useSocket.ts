@@ -28,15 +28,34 @@ export function useSocket(token: string | null) {
     // ── Initial REST fetch for fleet data ──────────────────
     const fetchInitialData = async () => {
       try {
-        const [devices, stats, alerts] = await Promise.all([
-          api.getFleet(),
-          api.getFleetStats(),
-          api.getAllAlerts(),
-        ]);
-        setFleetSnapshot(devices);
-        setFleetStats(stats);
-        setAlertsSnapshot(alerts);
+        const devicesPromise = api.getFleet().catch((e) => {
+          console.warn('getFleet error:', e);
+          return [];
+        });
+        const statsPromise = api.getFleetStats().catch((e) => {
+          console.warn('getFleetStats error:', e);
+          return null;
+        });
+        const alertsPromise = api.getAllAlerts().catch((e) => {
+          console.warn('getAllAlerts error:', e);
+          return [];
+        });
+
+        const [devices, stats, alerts] = await Promise.all([devicesPromise, statsPromise, alertsPromise]);
+
+        if (Array.isArray(devices) && devices.length > 0) {
+          setFleetSnapshot(devices);
+          setConnected(true);
+        }
+        if (stats) {
+          setFleetStats(stats);
+        }
+        if (Array.isArray(alerts)) {
+          setAlertsSnapshot(alerts);
+        }
+
         setConnected(true);
+
 
         // Dynamically compute the server-client clock offset based on the latest timestamps
         let maxOnlineTime = 0;
