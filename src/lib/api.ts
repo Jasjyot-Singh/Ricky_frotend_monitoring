@@ -12,9 +12,7 @@ import type {
   LoginResponse,
 } from '../types/fleet.types';
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
-
-
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://ec2-65-0-97-54.ap-south-1.compute.amazonaws.com';
 
 // ─── Core Fetch Wrapper ──────────────────────────────────────────────────────
 
@@ -29,10 +27,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
     headers,
     ...options,
   });
+
 
 
   // Auto-refresh on 401
