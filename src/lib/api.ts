@@ -12,7 +12,8 @@ import type {
   LoginResponse,
 } from '../types/fleet.types';
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://ec2-65-0-97-54.ap-south-1.compute.amazonaws.com';
+
 
 // ─── Core Fetch Wrapper ──────────────────────────────────────────────────────
 

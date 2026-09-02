@@ -5,7 +5,8 @@
  */
 
 const WS_URL = import.meta.env.VITE_WS_URL || 
-  ((import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080').replace(/^http/, 'ws') + '/ws');
+  ((import.meta.env.VITE_BACKEND_URL || 'https://ec2-65-0-97-54.ap-south-1.compute.amazonaws.com').replace(/^http/, 'ws') + '/ws');
+
 
 
 type EventHandler = (data: unknown) => void;
