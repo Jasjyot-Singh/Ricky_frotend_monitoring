@@ -12,7 +12,8 @@ import type {
   LoginResponse,
 } from '../types/fleet.types';
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://ec2-65-0-97-54.ap-south-1.compute.amazonaws.com';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+
 
 
 // ─── Core Fetch Wrapper ──────────────────────────────────────────────────────
