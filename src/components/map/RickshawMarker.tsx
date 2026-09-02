@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import type { DeviceStatus } from '../../types/fleet.types';
+
 import { getMarkerState, MARKER_COLORS } from '../../types/fleet.types';
 import { useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds } from '../../store/useFleetStore';
 
@@ -101,8 +103,12 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
           {/* Header */}
           <div className="flex items-center justify-between border-b border-surface-800 pb-2">
             <div>
-              <p className="font-bold text-white text-sm">{device.vehicleNumber || device.deviceId}</p>
-              <p className="text-[11px] text-surface-400 font-mono">{device.deviceId}</p>
+              <p className="font-bold text-white text-sm">
+                {DOMPurify.sanitize(device.vehicleNumber || device.deviceId)}
+              </p>
+              <p className="text-[11px] text-surface-400 font-mono">
+                {DOMPurify.sanitize(device.deviceId)}
+              </p>
             </div>
             <span
               className={`badge ${
@@ -149,9 +155,10 @@ const RickshawMarker: React.FC<RickshawMarkerProps> = React.memo(({ device, onCl
             <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
               <span className="text-surface-400 text-[10px] uppercase font-medium block">Driver</span>
               <p className="text-white font-semibold truncate mt-0.5">
-                {device.driverName || 'Unassigned'}
+                {DOMPurify.sanitize(device.driverName || 'Unassigned')}
               </p>
             </div>
+
             <div className="bg-surface-800/60 p-2 rounded-lg border border-surface-700/50">
               <span className="text-surface-400 text-[10px] uppercase font-medium block">Last Seen</span>
               <p className="text-white font-semibold font-mono mt-0.5">
