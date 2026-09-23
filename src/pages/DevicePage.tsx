@@ -245,7 +245,7 @@ const DevicePage: React.FC = () => {
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
-  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2d7i_1_293ed9b7d0fb0ffe74a34e7a';
   const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`;
 
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;
