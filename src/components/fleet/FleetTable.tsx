@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { useDeviceList, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../../store/useFleetStore';
+
 import { getMarkerState } from '../../types/fleet.types';
 import StatusBadge from './StatusBadge';
 
@@ -121,7 +123,7 @@ const FleetTable: React.FC = () => {
               type="text"
               placeholder="Search devices, vehicles, drivers..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearch(DOMPurify.sanitize(e.target.value))}
               className="w-72 bg-surface-800/50 border border-surface-700/50 rounded-xl px-4 py-2.5 text-sm text-surface-200 placeholder-surface-500
                          focus:outline-none focus:ring-2 focus:ring-fleet-500/30 focus:border-fleet-500/50 transition-all"
             />
@@ -190,13 +192,16 @@ const FleetTable: React.FC = () => {
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-mono text-sm text-fleet-400 group-hover:text-fleet-300">
-                      {device.deviceId}
+                      {DOMPurify.sanitize(device.deviceId)}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-sm text-surface-300">{device.vehicleNumber}</td>
-                  <td className="px-4 py-3.5 text-sm text-surface-400">
-                    {device.driverName || '—'}
+                  <td className="px-4 py-3.5 text-sm text-surface-300">
+                    {DOMPurify.sanitize(device.vehicleNumber)}
                   </td>
+                  <td className="px-4 py-3.5 text-sm text-surface-400">
+                    {DOMPurify.sanitize(device.driverName || '—')}
+                  </td>
+
                   <td className="px-4 py-3.5 text-xs font-mono text-surface-400">
                     {offline && (
                       <span className="text-[9px] text-surface-500 font-sans font-semibold uppercase block mb-0.5">Last Seen</span>

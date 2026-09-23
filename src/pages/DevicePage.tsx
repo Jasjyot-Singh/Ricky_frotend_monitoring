@@ -3,7 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import DOMPurify from 'dompurify';
 import { useDevice, useFleetStore, useActiveSosDeviceIds, useActiveWarningDeviceIds, computeActiveStatus } from '../store/useFleetStore';
+
 import { getMarkerState, MARKER_COLORS } from '../types/fleet.types';
 import type { LocationPoint, CommandType, DeviceDetailResponse, DeviceCommand } from '../types/fleet.types';
 import { api } from '../lib/api';
@@ -206,10 +208,11 @@ const DevicePage: React.FC = () => {
 
   const handleSendCommand = useCallback(async (command: CommandType) => {
     if (!deviceId) return;
+    const cleanCommand = DOMPurify.sanitize(command.trim());
     setSendingCommand(true);
     setCommandStatus(null);
     try {
-      const res = await api.sendCommand(deviceId, command);
+      const res = await api.sendCommand(deviceId, cleanCommand);
       setCommandStatus(`✅ ${res.message} (ID: ${res.commandId})`);
       // Immediately refresh command history
       const freshCommands = await api.getCommandHistory(deviceId);
@@ -221,6 +224,7 @@ const DevicePage: React.FC = () => {
       setTimeout(() => setCommandStatus(null), 5000);
     }
   }, [deviceId]);
+
 
   if (!device) {
     return (
@@ -241,7 +245,7 @@ const DevicePage: React.FC = () => {
   const color = MARKER_COLORS[state];
   const icon = createDetailMarkerIcon(color);
 
-  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || 'cb1_2d7i_1_293ed9b7d0fb0ffe74a34e7a';
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
   const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`;
 
   const latitude = deviceDetail?.liveStatus.latitude ?? device.latitude;

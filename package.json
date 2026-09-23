@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/dompurify": "^3.0.5",
     "chart.js": "^4.4.7",
+    "dompurify": "^3.4.14",
     "leaflet": "^1.9.4",
     "react": "^19.2.6",
     "react-chartjs-2": "^5.3.0",
